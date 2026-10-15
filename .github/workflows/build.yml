@@ -16,9 +16,13 @@ jobs:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
+      
       - name: Instalar bibliotecas do Switch
         run: |
-          dkp-pacman -Sy --noconfirm --needed switch-sdl2 switch-sdl2_image switch-libzip switch-zlib
+          echo "Verificando acesso ao repositorio devkitPro"
+          curl -IL --max-time 20 https://pkg.devkitpro.org/dkp-libs.db
+          dkp-pacman -Syy --noconfirm
+          dkp-pacman -S --noconfirm --needed switch-sdl2 switch-sdl2_image switch-libzip switch-zlib
 
       - name: Verificar bibliotecas
         run: |
