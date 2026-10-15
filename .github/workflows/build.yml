@@ -4,7 +4,7 @@ name: Build MangaCAP Switch
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   build:
@@ -16,14 +16,24 @@ jobs:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
+      - name: Instalar bibliotecas do Switch
+        run: |
+          dkp-pacman -Sy --noconfirm --needed switch-sdl2 switch-sdl2_image switch-libzip switch-zlib
+
+      - name: Verificar bibliotecas
+        run: |
+          test -f /opt/devkitpro/portlibs/switch/include/SDL2/SDL.h
+          test -f /opt/devkitpro/portlibs/switch/include/zip.h
+
       - name: Compilar MangaCAP
-        run: make
+        run: make -j2
 
       - name: Verificar NRO
-        run: test -f MangaCAP.nro
+        run: test -s MangaCAP.nro && ls -lh MangaCAP.nro
 
       - name: Disponibilizar aplicativo
         uses: actions/upload-artifact@v4
         with:
-          name: MangaCAP-Switch-v0.2-NRO
+          name: MangaCAP-Switch-v0.3.1-NRO
           path: MangaCAP.nro
+          if-no-files-found: error
