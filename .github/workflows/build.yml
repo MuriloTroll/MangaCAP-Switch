@@ -1,50 +1,28 @@
-
 name: Build MangaCAP Switch
-
 on:
   workflow_dispatch:
   push:
     branches: [main, master]
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     container:
       image: devkitpro/devkita64:latest
-
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
-
-      - name: Verificar ambiente
-        shell: bash
+      - name: Verificar bibliotecas existentes
         run: |
-          echo "=== devkitPro ==="
-          echo "DEVKITPRO=$DEVKITPRO"
-          echo "=== Bibliotecas disponíveis ==="
-          ls /opt/devkitpro/portlibs/switch/include/SDL2/SDL.h
-          ls /opt/devkitpro/portlibs/switch/include/SDL2/SDL_image.h
-          echo "=== Verificando suporte ZIP ==="
-          if test -f /opt/devkitpro/portlibs/switch/include/zip.h; then
-            echo "libzip disponível"
-          else
-            echo "libzip não está disponível"
-            echo "O leitor precisa ser adaptado para outra biblioteca ZIP."
-            exit 1
-          fi
-
+          test -f /opt/devkitpro/portlibs/switch/include/SDL2/SDL.h
+          test -f /opt/devkitpro/portlibs/switch/include/SDL2/SDL_image.h
+          test -f /opt/devkitpro/portlibs/switch/include/zlib.h
       - name: Compilar MangaCAP
         run: make -j2
-
-      - name: Verificar aplicativo
-        run: |
-          test -s MangaCAP.nro
-          ls -lh MangaCAP.nro
-
+      - name: Verificar NRO
+        run: test -s MangaCAP.nro && ls -lh MangaCAP.nro
       - name: Disponibilizar aplicativo
         uses: actions/upload-artifact@v4
         with:
-          name: MangaCAP-Switch-v0.3.1-NRO
+          name: MangaCAP-Switch-v0.3.2-NRO
           path: MangaCAP.nro
           if-no-files-found: error
