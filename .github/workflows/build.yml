@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     container:
       image: devkitpro/devkita64:latest
 
@@ -16,24 +17,30 @@ jobs:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      
-      - name: Instalar bibliotecas do Switch
+      - name: Verificar ambiente
+        shell: bash
         run: |
-          echo "Verificando acesso ao repositorio devkitPro"
-          curl -IL --max-time 20 https://pkg.devkitpro.org/dkp-libs.db
-          dkp-pacman -Syy --noconfirm
-          dkp-pacman -S --noconfirm --needed switch-sdl2 switch-sdl2_image switch-libzip switch-zlib
-
-      - name: Verificar bibliotecas
-        run: |
-          test -f /opt/devkitpro/portlibs/switch/include/SDL2/SDL.h
-          test -f /opt/devkitpro/portlibs/switch/include/zip.h
+          echo "=== devkitPro ==="
+          echo "DEVKITPRO=$DEVKITPRO"
+          echo "=== Bibliotecas disponíveis ==="
+          ls /opt/devkitpro/portlibs/switch/include/SDL2/SDL.h
+          ls /opt/devkitpro/portlibs/switch/include/SDL2/SDL_image.h
+          echo "=== Verificando suporte ZIP ==="
+          if test -f /opt/devkitpro/portlibs/switch/include/zip.h; then
+            echo "libzip disponível"
+          else
+            echo "libzip não está disponível"
+            echo "O leitor precisa ser adaptado para outra biblioteca ZIP."
+            exit 1
+          fi
 
       - name: Compilar MangaCAP
         run: make -j2
 
-      - name: Verificar NRO
-        run: test -s MangaCAP.nro && ls -lh MangaCAP.nro
+      - name: Verificar aplicativo
+        run: |
+          test -s MangaCAP.nro
+          ls -lh MangaCAP.nro
 
       - name: Disponibilizar aplicativo
         uses: actions/upload-artifact@v4
