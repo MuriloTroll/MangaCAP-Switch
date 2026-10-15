@@ -1,23 +1,30 @@
-# MangaCAP Switch V0.2 — teste de inicialização
+# MangaCAP Switch V0.3 — primeiro leitor experimental
 
-**Importante:** este pacote contém o código-fonte, **não** um `.nro` pronto. A compilação automática pelo GitHub Actions produz o `MangaCAP.nro` para instalar no Switch. Este ambiente não tem o devkitPro e **não validou a compilação**.
+**Não é um NRO pronto.** Este ZIP contém o projeto para o GitHub compilar, como ocorreu na V0.2. O build da V0.3 ainda **não foi executado/validado**; pode exigir ajustes nas dependências e no código.
 
-## Como obter o `.nro` usando GitHub (sem instalar compiladores)
+## Mudanças
+- Biblioteca gráfica simples preto/vermelho com nomes de arquivos CBZ/ZIP.
+- Abrir imagens PNG/JPEG/WebP contidas em arquivos CBZ/ZIP (dependente dos decodificadores presentes no build).
+- Direita/esquerda muda página; L/R altera zoom; B retorna à biblioteca.
+- Progresso por volume em `sdmc:/switch/MangaCAP/progress.tsv`.
+- Log de inicialização em `sdmc:/switch/MangaCAP/startup.log` para investigar falhas.
+- Não extrai arquivos para o microSD e limita imagens descompactadas a 24 MB.
 
-1. Crie um repositório GitHub e envie **o conteúdo desta pasta** para a raiz do repositório, inclusive `.github/workflows/build.yml` (a pasta `.github` é oculta no Windows).
-2. Abra **Actions** > **Build MangaCAP Switch** > **Run workflow**.
-3. Aguarde a execução. Se ficar verde, abra a execução e baixe o artefato **MangaCAP-Switch-v0.2-NRO**.
-4. Extraia `MangaCAP.nro` do artefato e copie para `sdmc:/switch/MangaCAP/MangaCAP.nro`.
-5. Coloque um `.cbz` em `sdmc:/switch/MangaCAP/books/` e abra pelo Sphaira.
+## Controles
+- Biblioteca: cima/baixo para selecionar, A para abrir, X para atualizar, + para sair.
+- Leitor: esquerda/direita para páginas, L/R zoom, B voltar, + sair.
 
-Se a compilação falhar, envie o log do GitHub Actions para corrigirmos. **Não renomeie o ZIP ou código-fonte para `.nro`**, pois o Sphaira não o reconhecerá.
+## Instalação após build bem-sucedido
+1. Envie **todos** os arquivos desta versão para a raiz do seu repositório `MangaCAP-Switch`, substituindo os existentes, inclusive `.github/workflows/build.yml`.
+2. Em GitHub Actions, execute `Build MangaCAP Switch` ou aguarde a execução do push.
+3. Em `Artifacts`, baixe `MangaCAP-Switch-v0.3-NRO`.
+4. Extraia o `MangaCAP.nro` e substitua o anterior em `sdmc:/switch/MangaCAP/MangaCAP.nro`.
+5. Mantenha os CBZ em `sdmc:/switch/MangaCAP/books`.
+6. Abra pelo Sphaira usando **segurar R ao iniciar um jogo**, que foi o método validado para a V0.2.
 
-## Teste
-
-A tela deve mostrar "MangaCAP SWITCH | V0.2" e listar nomes de arquivos CBZ/ZIP. Cima/Baixo navegam; X atualiza a lista; + sai. **Ainda não abre páginas**: o objetivo desta versão é confirmar a inicialização, o ícone e o acesso ao microSD.
-
-## Compilação local alternativa
-
-Com `devkitPro`, `devkitA64` e `libnx` instalados: `make` na raiz do projeto. O `Makefile` segue o padrão `switch_rules` de projetos homebrew. Dependendo da versão do SDK, podem ser necessários ajustes.
-
-Este protótipo não inclui nem reutiliza código do Themezer-NX ou HATS Tools.
+## Limitações
+- Interface simples, sem capas em grade, sem rolagem contínua, sem suporte a toque, sem ordenação natural de páginas.
+- ZIPs com imagens muito grandes podem falhar por limite de memória/decodificação.
+- Apenas arquivos CBZ/ZIP diretamente na pasta books, não subpastas.
+- Se o app fechar, procure `startup.log` no cartão microSD e compartilhe seu conteúdo.
+- Este código ainda não foi compilado com o toolchain do Switch neste ambiente. O GitHub Actions será nosso teste de compilação.

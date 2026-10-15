@@ -6,7 +6,7 @@ TOPDIR ?= $(CURDIR)
 include $(DEVKITPRO)/libnx/switch_rules
 APP_TITLE := MangaCAP Switch
 APP_AUTHOR := MangaCAP
-APP_VERSION := 0.2.0
+APP_VERSION := 0.3.0
 TARGET := MangaCAP
 BUILD := build
 SOURCES := source
@@ -19,8 +19,8 @@ CFLAGS += $(INCLUDE)
 CXXFLAGS := $(CFLAGS) -std=gnu++17 -fno-rtti -fno-exceptions
 ASFLAGS := -g $(ARCH)
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LIBS := -lnx
-LIBDIRS := $(LIBNX)
+LIBS := -lzip -lSDL2_image -lSDL2 -lpng -ljpeg -lwebp -lz -lnx
+LIBDIRS := $(PORTLIBS) $(LIBNX)
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 export OUTPUT := $(CURDIR)/$(TARGET)
 export TOPDIR := $(CURDIR)
