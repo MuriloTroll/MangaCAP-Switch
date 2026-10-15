@@ -1,7 +1,7 @@
 #include <switch.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include <zip.h>
+#include "cbz_zip.h"
 #include "font.h"
 #include <algorithm>
 #include <cctype>
@@ -23,8 +23,18 @@ static bool isImage(const std::string& s){return ends(s,".png")||ends(s,".jpg")|
 static std::vector<Book> scan(){mkdir(ROOT,0777);mkdir(BOOKS,0777);std::vector<Book> b;DIR* d=opendir(BOOKS);if(!d)return b;dirent* e;while((e=readdir(d))&&b.size()<250){std::string n=e->d_name;if(ends(n,".cbz")||ends(n,".zip"))b.push_back({n,std::string(BOOKS)+"/"+n});}closedir(d);std::sort(b.begin(),b.end(),[](const Book&a,const Book&b){return lower(a.name)<lower(b.name);});return b;}
 static int getSaved(const std::string& path){std::ifstream f(PROGRESS);std::string line;while(std::getline(f,line)){auto pos=line.find('\t');if(pos!=std::string::npos&&line.substr(pos+1)==path)return atoi(line.substr(0,pos).c_str());}return 0;}
 static void save(const std::string& path,int page){std::ifstream f(PROGRESS);std::vector<std::string> lines;std::string line;while(std::getline(f,line)){auto p=line.find('\t');if(p==std::string::npos||line.substr(p+1)!=path)lines.push_back(line);}f.close();std::ofstream out(PROGRESS,std::ios::trunc);for(auto& l:lines)out<<l<<'\n';out<<page<<'\t'<<path<<'\n';}
-static std::vector<std::string> listPages(zip_t* z){std::vector<std::string> names;zip_int64_t n=zip_get_num_entries(z,0);for(zip_uint64_t i=0;i<(zip_uint64_t)std::max((zip_int64_t)0,n)&&names.size()<2000;i++){const char* s=zip_get_name(z,i,0);if(s&&isImage(s)&&std::string(s).find("__MACOSX/")!=0)names.emplace_back(s);}std::sort(names.begin(),names.end());return names;}
-static SDL_Texture* decode(SDL_Renderer*r,zip_t*z,const std::string& name,int&w,int&h){zip_stat_t st;zip_stat_init(&st);if(zip_stat(z,name.c_str(),0,&st)<0||st.size==0||st.size>24*1024*1024)return nullptr;zip_file_t*f=zip_fopen(z,name.c_str(),0);if(!f)return nullptr;std::vector<unsigned char> buf((size_t)st.size);size_t off=0;while(off<buf.size()){zip_int64_t n=zip_fread(f,buf.data()+off,buf.size()-off);if(n<=0)break;off+=(size_t)n;}zip_fclose(f);if(off!=buf.size())return nullptr;SDL_RWops* rw=SDL_RWFromConstMem(buf.data(),(int)buf.size());if(!rw)return nullptr;SDL_Surface* surf=IMG_Load_RW(rw,1);if(!surf)return nullptr;w=surf->w;h=surf->h;SDL_Texture*t=SDL_CreateTextureFromSurface(r,surf);SDL_FreeSurface(surf);return t;}
+static std::vector<std::string> listPages(CbzZip* z){
+    std::vector<std::string> names;
+    for(const auto& e:z->entries()) if(isImage(e.name) && e.name.find("__MACOSX/")!=0 && names.size()<2000) names.push_back(e.name);
+    std::sort(names.begin(),names.end());return names;
+}
+static SDL_Texture* decode(SDL_Renderer*r,CbzZip*z,const std::string& name,int&w,int&h){
+    std::vector<unsigned char> buf;
+    if(!z->read(name,buf,24*1024*1024) || buf.empty())return nullptr;
+    SDL_RWops*rw=SDL_RWFromConstMem(buf.data(),(int)buf.size());if(!rw)return nullptr;
+    SDL_Surface*surf=IMG_Load_RW(rw,1);if(!surf)return nullptr;
+    w=surf->w;h=surf->h;SDL_Texture*t=SDL_CreateTextureFromSurface(r,surf);SDL_FreeSurface(surf);return t;
+}
 static void fill(SDL_Renderer*r,int x,int y,int w,int h,Uint8 R,Uint8 G,Uint8 B){SDL_SetRenderDrawColor(r,R,G,B,255);SDL_Rect d{x,y,w,h};SDL_RenderFillRect(r,&d);}
 static void label(SDL_Renderer*r,int x,int y,const std::string& s,int scale=2,Uint8 R=240,Uint8 G=240,Uint8 B=240){SDL_SetRenderDrawColor(r,R,G,B,255);for(unsigned char c:s){if(c<32||c>126)c='?';auto glyph=FONT[c-32];for(int row=0;row<15;row++)for(int col=0;col<9;col++)if(glyph[row]&(1<<col)){SDL_Rect d{x+col*scale,y+row*scale,scale,scale};SDL_RenderFillRect(r,&d);}x+=10*scale;if(x>1260)break;}}
 int main(int argc,char**argv){(void)argc;(void)argv;
@@ -36,8 +46,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     SDL_Window*win=SDL_CreateWindow("MangaCAP Switch",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,1280,720,SDL_WINDOW_SHOWN);if(!win){mark(SDL_GetError());return 1;}
     SDL_Renderer*r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED);if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);if(!r){mark(SDL_GetError());return 1;}mark("renderer OK");
     SDL_GameController*ctl=nullptr;for(int i=0;i<SDL_NumJoysticks();i++)if(SDL_IsGameController(i)){ctl=SDL_GameControllerOpen(i);break;}
-    auto books=scan();mark("biblioteca OK");int selected=0,page=0,iw=1,ih=1;float zoom=1.0f;zip_t*z=nullptr;SDL_Texture*tex=nullptr;std::vector<std::string> pages;std::string message;
-    auto release=[&](){if(tex){SDL_DestroyTexture(tex);tex=nullptr;}if(z){zip_close(z);z=nullptr;}pages.clear();};
+    auto books=scan();mark("biblioteca OK");int selected=0,page=0,iw=1,ih=1;float zoom=1.0f;CbzZip*z=nullptr;SDL_Texture*tex=nullptr;std::vector<std::string> pages;std::string message;
+    auto release=[&](){if(tex){SDL_DestroyTexture(tex);tex=nullptr;}if(z){delete z;z=nullptr;}pages.clear();};
     auto load=[&](){if(tex){SDL_DestroyTexture(tex);tex=nullptr;}if(z&&!pages.empty()){tex=decode(r,z,pages[page],iw,ih);if(!tex)message="Falha ao decodificar imagem";else message.clear();}};
     bool running=true;while(running){SDL_Event ev;while(SDL_PollEvent(&ev)){
         if(ev.type==SDL_QUIT){running=false;break;}
@@ -47,7 +57,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         if(!z){if((b==SDL_CONTROLLER_BUTTON_DPAD_DOWN||k==SDLK_DOWN)&&selected+1<(int)books.size())selected++;
             if((b==SDL_CONTROLLER_BUTTON_DPAD_UP||k==SDLK_UP)&&selected>0)selected--;
             if(b==SDL_CONTROLLER_BUTTON_X||k==SDLK_F5){books=scan();selected=0;}
-            if((b==SDL_CONTROLLER_BUTTON_A||k==SDLK_RETURN)&&!books.empty()){int err=0;z=zip_open(books[selected].path.c_str(),ZIP_RDONLY,&err);if(!z){message="Nao foi possivel abrir o CBZ";continue;}pages=listPages(z);if(pages.empty()){message="CBZ sem imagens compativeis";release();continue;}page=std::max(0,std::min(getSaved(books[selected].path),(int)pages.size()-1));zoom=1;load();mark("CBZ aberto");}}
+            if((b==SDL_CONTROLLER_BUTTON_A||k==SDLK_RETURN)&&!books.empty()){int err=0;z=new CbzZip(books[selected].path);if(!z->valid()){delete z;z=nullptr;message="Nao foi possivel abrir o CBZ";continue;}pages=listPages(z);if(pages.empty()){message="CBZ sem imagens compativeis";release();continue;}page=std::max(0,std::min(getSaved(books[selected].path),(int)pages.size()-1));zoom=1;load();mark("CBZ aberto");}}
         else {if(b==SDL_CONTROLLER_BUTTON_B||k==SDLK_BACKSPACE){save(books[selected].path,page);release();continue;}
             if((b==SDL_CONTROLLER_BUTTON_DPAD_RIGHT||k==SDLK_RIGHT)&&page+1<(int)pages.size()){page++;save(books[selected].path,page);load();}
             if((b==SDL_CONTROLLER_BUTTON_DPAD_LEFT||k==SDLK_LEFT)&&page>0){page--;save(books[selected].path,page);load();}
