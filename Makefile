@@ -21,6 +21,8 @@ ASFLAGS := -g $(ARCH)
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 LIBS := -lzip -lSDL2_image -lSDL2 -lpng -ljpeg -lwebp -lz -lnx
 LIBDIRS := $(PORTLIBS) $(LIBNX)
+# SDL2 headers live in the SDL2 subdirectory of the Switch portlibs.
+INCLUDES := $(DEVKITPRO)/portlibs/switch/include/SDL2
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 export OUTPUT := $(CURDIR)/$(TARGET)
 export TOPDIR := $(CURDIR)
