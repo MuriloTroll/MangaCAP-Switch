@@ -1,4 +1,4 @@
-# MangaCAP Switch V0.3.2 — tentativa de compilação sem libzip
+# MangaCAP Switch V0.3.3 — tentativa de compilação sem libzip
 
 **Não é um NRO compilado.** Código-fonte para o GitHub Actions, sem instalação de pacotes via devkitPro (servidor retornava 403).
 
