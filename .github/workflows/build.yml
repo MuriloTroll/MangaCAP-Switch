@@ -1,0 +1,29 @@
+
+name: Build MangaCAP Switch
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:latest
+
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Compilar MangaCAP
+        run: make
+
+      - name: Verificar NRO
+        run: test -f MangaCAP.nro
+
+      - name: Disponibilizar aplicativo
+        uses: actions/upload-artifact@v4
+        with:
+          name: MangaCAP-Switch-v0.2-NRO
+          path: MangaCAP.nro
