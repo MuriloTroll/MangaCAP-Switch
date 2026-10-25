@@ -18,6 +18,17 @@ jobs:
           test -f /opt/devkitpro/portlibs/switch/include/zlib.h
       - name: Verificar EGL
         run: test -f /opt/devkitpro/portlibs/switch/lib/libEGL.a
+      - name: Verificar bibliotecas graficas
+        run: |
+          for lib in EGL glapi drm_nouveau; do
+            test -f "/opt/devkitpro/portlibs/switch/lib/lib${lib}.a" || { echo "Biblioteca ausente: lib${lib}.a"; exit 1; }
+          done
+          echo "libdrm.a nao sera exigida nesta tentativa"
+      - name: Instalar biblioteca HTTPS para capas
+        run: |
+          dkp-pacman -Sy --noconfirm switch-curl switch-mbedtls
+          test -f /opt/devkitpro/portlibs/switch/include/curl/curl.h
+          test -f /opt/devkitpro/portlibs/switch/lib/libcurl.a
       - name: Compilar MangaCAP
         run: make -j2
       - name: Verificar NRO
@@ -25,6 +36,6 @@ jobs:
       - name: Disponibilizar aplicativo
         uses: actions/upload-artifact@v4
         with:
-          name: MangaCAP-Switch-v0.3.3-NRO
+          name: MangaCAP-Switch-v0.7.1-Capas-Online-NRO
           path: MangaCAP.nro
           if-no-files-found: error
