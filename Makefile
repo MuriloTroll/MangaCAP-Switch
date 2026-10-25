@@ -4,9 +4,10 @@ $(error Set DEVKITPRO to your devkitPro installation path)
 endif
 TOPDIR ?= $(CURDIR)
 include $(DEVKITPRO)/libnx/switch_rules
-APP_TITLE := MangaCAP Switch
+APP_TITLE := MangaCAP
 APP_AUTHOR := MangaCAP
-APP_VERSION := 0.3.3
+APP_VERSION := 0.7.9-test1
+ICON := $(TOPDIR)/icon.jpg
 TARGET := MangaCAP
 BUILD := build
 SOURCES := source
@@ -19,7 +20,7 @@ CFLAGS += $(INCLUDE)
 CXXFLAGS := $(CFLAGS) -std=gnu++17 -fno-rtti -fno-exceptions
 ASFLAGS := -g $(ARCH)
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LIBS := -lSDL2_image -lSDL2 -lEGL -lpng -ljpeg -lwebp -lz -lnx
+LIBS := -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lm -lSDL2_image -lSDL2 -lEGL -lglapi -ldrm_nouveau -lpng -ljpeg -lwebp -lz -lnx
 LIBDIRS := $(PORTLIBS) $(LIBNX)
 # SDL2 headers live in the SDL2 subdirectory of the Switch portlibs.
 INCLUDES :=
@@ -46,7 +47,12 @@ DEPENDS := $(OFILES:.o=.d)
 -include $(DEPENDS)
 .PHONY: all
 all: $(OUTPUT).nro
-$(OUTPUT).nro: $(OUTPUT).elf $(OUTPUT).nacp
+# Explicitly embed the icon and NACP metadata into the NRO.
+# Do not rely on implicit rules that may omit --icon / --nacp.
+$(OUTPUT).nacp:
+	nacptool --create "$(APP_TITLE)" "$(APP_AUTHOR)" "$(APP_VERSION)" "$@"
+$(OUTPUT).nro: $(OUTPUT).elf $(OUTPUT).nacp $(ICON)
+	elf2nro "$(OUTPUT).elf" "$@" --icon="$(ICON)" --nacp="$(OUTPUT).nacp"
 $(OUTPUT).elf: $(OFILES)
 	$(LINK.cpp) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
 endif
