@@ -1419,16 +1419,9 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             }
             if((b==SDL_CONTROLLER_BUTTON_RIGHTSTICK||k==SDLK_F8)&&privateMode&&privateUnlocked){beginSecurity(6);continue;}
             if((b==SDL_CONTROLLER_BUTTON_RIGHTSTICK||k==SDLK_F8)&&!privateMode&&security.valid){beginSecurity(5);continue;}
-            if(b==SDL_CONTROLLER_BUTTON_Y||k==SDLK_F5){refreshLibrary();continue;}
-            // X: descarta a capa online da obra selecionada e pesquisa novamente.
-            if((b==SDL_CONTROLLER_BUTTON_X||k==SDLK_F6)&&!works.empty()){
-                std::string key=coverKey(works[selected].title);
-                std::string cache=std::string("sdmc:/switch/MangaCAP/covers/")+key+".jpg";
-                remove(cache.c_str());
-                coverTried.clear();
-                refreshCovers();
-                continue;
-            }
+            // Biblioteca: Y e X nao executam acoes de atualizacao/limpeza de capas.
+            // O Y do leitor permanece ativo para alternar modo de leitura.
+            if(b==SDL_CONTROLLER_BUTTON_Y||b==SDL_CONTROLLER_BUTTON_X||k==SDLK_F5||k==SDLK_F6)continue;
             if(back && libraryScreen==1){libraryScreen=0;libraryPortraitScroll=0;libraryHorizontalScroll=0;continue;}
             int count=libraryScreen==0?(int)works.size():(works.empty()?0:(int)works[selected].volumes.size());
             int& pos=libraryScreen==0?selected:selectedVolume;
