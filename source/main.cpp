@@ -4,6 +4,7 @@
 #include "cbz_zip.h"
 #include "pdf_convert.h"
 #include "font.h"
+#include "rotate_cw_png.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -812,38 +813,28 @@ static void roundedFill(SDL_Renderer* r,int x,int y,int w,int h,int rad,Uint8 R,
         SDL_Rect line{x+inset,y+yy,w-2*inset,1};SDL_RenderFillRect(r,&line);
     }
 }
-static void drawRotateIcon(SDL_Renderer* r,int cx,int cy,int radius){
-    // Arco e ponta tangente no MESMO sentido (horario nas coordenadas SDL).
-    const float pi=3.14159265358979323846f;
-    SDL_SetRenderDrawColor(r,248,248,250,255);
-    const int first=-55, last=195;
-    for(int thick=-1;thick<=1;thick++){
-        const int rr=radius+thick;
-        for(int deg=first;deg<last;deg+=2){
-            const float a=deg*pi/180.f,b=(deg+2)*pi/180.f;
-            SDL_RenderDrawLine(r,cx+(int)std::lround(rr*std::cos(a)),cy+(int)std::lround(rr*std::sin(a)),
-                cx+(int)std::lround(rr*std::cos(b)),cy+(int)std::lround(rr*std::sin(b)));
-        }
+// Icone PNG antialias, carregado uma unica vez por renderer (sem depender do SD).
+static SDL_Texture* rotateIconTexture(SDL_Renderer* r){
+    static SDL_Texture* icon=nullptr;
+    static SDL_Renderer* owner=nullptr;
+    if(owner!=r){icon=nullptr;owner=r;}
+    if(!icon){
+        SDL_RWops* rw=SDL_RWFromConstMem(ROTATE_CW_PNG,(int)ROTATE_CW_PNG_SIZE);
+        SDL_Surface* surface=rw?IMG_Load_RW(rw,1):nullptr;
+        if(surface){icon=SDL_CreateTextureFromSurface(r,surface);SDL_FreeSurface(surface);}
+        if(icon)SDL_SetTextureBlendMode(icon,SDL_BLENDMODE_BLEND);
     }
-    // No fim do arco, tangente = (-sin(a),cos(a)); a ponta aponta nessa direcao.
-    const float a=last*pi/180.f;
-    const float tx=-std::sin(a),ty=std::cos(a);
-    const float nx=-ty,ny=tx;
-    const float ex=cx+radius*std::cos(a),ey=cy+radius*std::sin(a);
-    const float bx=ex-10.f*tx,by=ey-10.f*ty;
-    for(int offset=-1;offset<=1;offset++){
-        SDL_RenderDrawLine(r,(int)std::lround(ex+offset*nx),(int)std::lround(ey+offset*ny),
-            (int)std::lround(bx+6.f*nx+offset*nx),(int)std::lround(by+6.f*ny+offset*ny));
-        SDL_RenderDrawLine(r,(int)std::lround(ex+offset*nx),(int)std::lround(ey+offset*ny),
-            (int)std::lround(bx-6.f*nx+offset*nx),(int)std::lround(by-6.f*ny+offset*ny));
-    }
+    return icon;
 }
 static void drawRotateButton(SDL_Renderer* r,int x,int y,int w,int h){
     // Mesmo tamanho e hitbox do Teste 5; volta a paleta vinho do Teste 4.
     const int bw=76,bh=54,bx=x+(w-bw)/2,by=y+(h-bh)/2;
     roundedFill(r,bx,by,bw,bh,13,127,28,57);
     roundedFill(r,bx+2,by+2,bw-4,bh-4,11,153,31,67);
-    drawRotateIcon(r,bx+bw/2,by+bh/2,16);
+    if(SDL_Texture* icon=rotateIconTexture(r)){
+        const SDL_Rect dst{bx+(bw-40)/2,by+(bh-40)/2,40,40};
+        SDL_RenderCopy(r,icon,nullptr,&dst);
+    }
 }
 
 int main(int argc,char**argv){(void)argc;(void)argv;
