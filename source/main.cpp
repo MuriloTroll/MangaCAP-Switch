@@ -1137,7 +1137,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             }
             if(ev.type==SDL_FINGERDOWN && !(z||textReading) && !securityScreen && libraryScreen==0){
                 if((portraitMode && portraitX>=390.f && portraitX<452.f && portraitY>=40.f && portraitY<104.f) ||
-                   (!portraitMode && ev.tfinger.x*1280.f>=900.f && ev.tfinger.x*1280.f<962.f &&
+                   (!portraitMode && ev.tfinger.x*1280.f>=950.f && ev.tfinger.x*1280.f<1012.f &&
                     ev.tfinger.y*720.f>=112.f && ev.tfinger.y*720.f<170.f)){
                     donationOpen=true;libraryTouchDragging=false;continue;
                 }
@@ -1148,7 +1148,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 libraryPortraitScroll=0;libraryTouchDragging=false;continue;
             }
             if(ev.type==SDL_FINGERDOWN && !portraitMode && !(z||textReading) && !securityScreen &&
-               ev.tfinger.x*1280.f>=984.f && ev.tfinger.x*1280.f<1046.f &&
+               ev.tfinger.x*1280.f>=1033.f && ev.tfinger.x*1280.f<1095.f &&
                ev.tfinger.y*720.f>=112.f && ev.tfinger.y*720.f<170.f){
                 libraryHorizontalScroll=0;libraryTouchDragging=false;continue;
             }
@@ -1581,8 +1581,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         label(r,36,20,"MangaCAP",3,245,245,248);
         label(r,36,75,libraryScreen==0?(privateMode?"BIBLIOTECA PRIVADA":"MINHA BIBLIOTECA"):"VOLUMES DA OBRA",1,196,196,208);
         label(r,1060,36,"V1.0.0",2,211,72,88);
-        if(libraryScreen==0)drawDonationButton(r,900,116);
-        drawLibraryTopButton(r,984,116);
+        if(libraryScreen==0)drawDonationButton(r,950,116);
+        drawLibraryTopButton(r,1033,116);
         if(libraryScreen==0)
             label(r,36,130,std::to_string(works.size())+" OBRAS  /  "+std::to_string(books.size())+" VOLUMES",1,175,178,188);
         else
