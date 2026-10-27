@@ -810,12 +810,13 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     SDL_Renderer*r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED);if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);if(!r){mark(SDL_GetError());return 1;}mark("renderer OK");
     // Teste 2: renderizacao isolada em textura para rotacao somente do aplicativo.
     SDL_Texture*portraitFrame=SDL_CreateTexture(r,SDL_PIXELFORMAT_RGBA8888,
-        SDL_TEXTUREACCESS_TARGET,1280,720);
+        SDL_TEXTUREACCESS_TARGET,720,1280);
+    SDL_Texture*landscapeFrame=SDL_CreateTexture(r,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,1280,720);
     if(portraitFrame)SDL_SetTextureBlendMode(portraitFrame,SDL_BLENDMODE_NONE);
     bool portraitMode=false;
     const SDL_Rect portraitButton{1050,112,210,62};
     auto togglePortrait=[&](){
-        if(!portraitFrame){mark("Rotacao indisponivel: sem textura de destino");return;}
+        if(!portraitFrame || !landscapeFrame){mark("Rotacao indisponivel: sem textura de destino");return;}
         portraitMode=!portraitMode;
         mark(portraitMode?"Modo retrato ativado":"Modo horizontal ativado");
     };
@@ -890,12 +891,12 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         load();
         panX=0;
         if(continuous){
-            float scale=(1280.f/(float)iw)*zoom;
+            float scale=((portraitMode?720.f:1280.f)/(float)iw)*zoom;
             float height=ih*scale;
             panY=fromBottom?std::max(0.f,height-(showReaderHud?697.f:720.f)):0.f;
         }else{
             // Pagina nova sempre comeca pelo topo, inclusive com zoom.
-            float scale=std::min(1280.f/(float)iw,697.f/(float)ih)*zoom;
+            float scale=std::min((portraitMode?720.f:1280.f)/(float)iw,(portraitMode?1120.f:697.f)/(float)ih)*zoom;
             panY=std::max(0.f,(ih*scale-(showReaderHud?697.f:720.f))*.5f);
         }
         if(activeBook>=0&&activeBook<(int)books.size())save(books[activeBook].path,page);
@@ -964,24 +965,70 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         selected=0;selectedVolume=0;libraryScreen=0;activeBook=-1;
         refreshCovers();coverTried.clear();pageCountCache.clear();
     };
+    bool touchDragging=false, touchMoved=false;
+    SDL_FingerID activeFinger=0;
+    float touchStartX=0, touchStartY=0, touchLastX=0, touchLastY=0;
+    auto logicalTouch=[&](float px,float py)->SDL_FPoint{
+        if(!portraitMode)return SDL_FPoint{px*1280.f,py*720.f};
+        float x=py*720.f,y=(1.f-px)*1280.f;
+        if(z||textReading)return SDL_FPoint{x,y};
+        return SDL_FPoint{x*1280.f/720.f,(y-437.5f)*720.f/405.f};
+    };
     bool running=true;while(running){SDL_Event ev;while(SDL_PollEvent(&ev)){
         if(ev.type==SDL_QUIT){running=false;break;}
-        // Converte toques fisicos para as coordenadas da interface original.
-        // Rotacao de 90 graus no sentido horario, exclusiva do framebuffer SDL.
-        if(portraitMode && (ev.type==SDL_FINGERDOWN || ev.type==SDL_FINGERMOTION || ev.type==SDL_FINGERUP)){
-            const float px=ev.tfinger.x,py=ev.tfinger.y;
-            ev.tfinger.x=py;
-            ev.tfinger.y=1.f-px;
-        }
         if(ev.type==SDL_KEYDOWN && ev.key.keysym.sym==SDLK_F9){togglePortrait();continue;}
-        if(ev.type==SDL_FINGERDOWN){
-            const int tx=(int)(ev.tfinger.x*1280.f),ty=(int)(ev.tfinger.y*720.f);
-            if(tx>=portraitButton.x && tx<portraitButton.x+portraitButton.w &&
-               ty>=portraitButton.y && ty<portraitButton.y+portraitButton.h){
-                togglePortrait();continue;
+        if(ev.type==SDL_FINGERDOWN || ev.type==SDL_FINGERMOTION || ev.type==SDL_FINGERUP){
+            SDL_FPoint pt=logicalTouch(ev.tfinger.x,ev.tfinger.y);
+            if(ev.type==SDL_FINGERDOWN){
+                touchDragging=(z||textReading);touchMoved=false;activeFinger=ev.tfinger.fingerId;
+                touchStartX=touchLastX=pt.x;touchStartY=touchLastY=pt.y;
+                // No leitor, processar o toque apenas ao soltar para distinguir arrasto de clique.
+                if(touchDragging)continue;
+            }else if(touchDragging && ev.tfinger.fingerId==activeFinger){
+                float dx=pt.x-touchLastX,dy=pt.y-touchLastY;
+                if(std::abs(pt.x-touchStartX)>13.f || std::abs(pt.y-touchStartY)>13.f)touchMoved=true;
+                if(ev.type==SDL_FINGERMOTION && touchMoved){
+                    panX+=dx;
+                    // Arrastar o conteudo para cima avanca a leitura.
+                    panY+=continuous?-dy:dy;
+                }
+                touchLastX=pt.x;touchLastY=pt.y;
+                if(ev.type==SDL_FINGERUP){
+                    touchDragging=false;
+                    if(touchMoved)continue;
+                    // Reutiliza o tratamento de clique abaixo.
+                    ev.type=SDL_FINGERDOWN;
+                }else continue;
+            }
+            if(ev.type==SDL_FINGERDOWN){
+                const SDL_Rect button=portraitMode?SDL_Rect{500,40,200,60}:portraitButton;
+                bool visible=!(z||textReading)||showReaderHud;
+                if(visible && pt.x>=button.x && pt.x<button.x+button.w &&
+                   pt.y>=button.y && pt.y<button.y+button.h){
+                    togglePortrait();showReaderHud=false;continue;
+                }
+                // As demais areas de toque continuam usando as coordenadas originais.
+                if(portraitMode && (z||textReading)){
+                    // Botao de capitulo no rodape do layout retrato.
+                    if(showReaderHud && pt.y>=1130.f && pt.y<=1220.f){
+                        int target=adjacentBook(pt.x<360.f?-1:1);
+                        if(target>=0){
+                            if(activeBook>=0)save(books[activeBook].path,page);
+                            openBook(target);
+                            const auto& vols=works[selected].volumes;
+                            for(size_t i=0;i<vols.size();++i)if(vols[i]==target)selectedVolume=(int)i;
+                        }
+                        continue;
+                    }
+                    showReaderHud=!showReaderHud;
+                    continue;
+                }
+                if(portraitMode){
+                    ev.tfinger.x=pt.x/1280.f;
+                    ev.tfinger.y=pt.y/720.f;
+                }
             }
         }
-
         // Toque revela os controles. Com controles visiveis, tocar em
         // "TOPO" retorna ao inicio do volume; outros toques ocultam.
         if(ev.type==SDL_FINGERDOWN && securityScreen){
@@ -1219,10 +1266,10 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     if((z||textReading) && tex && iw>0 && ih>0){
         if(continuous){
             // Pagina ajustada a largura, rolando de cima para baixo.
-            float scale=(1280.f/(float)iw)*zoom;
+            float scale=((portraitMode?720.f:1280.f)/(float)iw)*zoom;
             float h=ih*scale;
             float w=iw*scale;
-            float maxX=std::max(0.f,(w-1280.f)*.5f);
+            float maxX=std::max(0.f,(w-(portraitMode?720.f:1280.f))*.5f);
             panX=std::max(-maxX,std::min(maxX,panX-axisX*10.f));
             panY+=axisY*10.f;
             const float gap=20.f;
@@ -1234,23 +1281,23 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             }else if(panY<0.f && page>0){
                 float carry=panY;
                 movePage(-1,false);
-                panY=std::max(0.f,ih*(1280.f/(float)iw)*zoom+gap+carry);
+                panY=std::max(0.f,ih*((portraitMode?720.f:1280.f)/(float)iw)*zoom+gap+carry);
             }
-            float currentH=ih*(1280.f/(float)iw)*zoom;
+            float currentH=ih*((portraitMode?720.f:1280.f)/(float)iw)*zoom;
             if(page+1==(int)pages.size())
-                panY=std::min(panY,std::max(0.f,currentH-(showReaderHud?697.f:720.f)));
+                panY=std::min(panY,std::max(0.f,currentH-(portraitMode?(showReaderHud?1120.f:1280.f):(showReaderHud?697.f:720.f))));
             else
                 panY=std::min(panY,currentH+gap);
             panY=std::max(0.f,panY);
         }else{
-            float scale=std::min(1280.f/(float)iw,697.f/(float)ih)*zoom;
-            float maxX=std::max(0.f,(iw*scale-1280.f)*.5f);
-            float maxY=std::max(0.f,(ih*scale-(showReaderHud?697.f:720.f))*.5f);
+            float scale=std::min((portraitMode?720.f:1280.f)/(float)iw,(portraitMode?1120.f:697.f)/(float)ih)*zoom;
+            float maxX=std::max(0.f,(iw*scale-(portraitMode?720.f:1280.f))*.5f);
+            float maxY=std::max(0.f,(ih*scale-(portraitMode?(showReaderHud?1120.f:1280.f):(showReaderHud?697.f:720.f)))*.5f);
             panX=std::max(-maxX,std::min(maxX,panX-axisX*10.f));
             panY=std::max(-maxY,std::min(maxY,panY-axisY*10.f));
         }
     }
-    if(portraitMode && portraitFrame)SDL_SetRenderTarget(r,portraitFrame);
+    if(portraitMode && landscapeFrame)SDL_SetRenderTarget(r,landscapeFrame);
     fill(r,0,0,1280,720,12,14,20);
     if(securityScreen){
         fill(r,0,0,1280,720,12,14,20);
@@ -1356,7 +1403,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         SDL_RenderSetClipRect(r,&viewport);
         if(tex){
             if(continuous){
-                float scale=(1280.f/(float)iw)*zoom;
+                float scale=((portraitMode?720.f:1280.f)/(float)iw)*zoom;
                 int w=(int)(iw*scale),h=(int)(ih*scale);
                 SDL_Rect dst{(1280-w)/2+(int)panX,-(int)panY,w,h};
                 SDL_RenderCopy(r,tex,nullptr,&dst);
@@ -1397,17 +1444,58 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         }
     }
     if(!message.empty()){fill(r,0,626,1280,42,128,24,40);label(r,30,634,message,2);}
-    // Botao global, inclusive na biblioteca, leitor e PIN.
-    fill(r,portraitButton.x,portraitButton.y,portraitButton.w,portraitButton.h,52,58,76);
-    fill(r,portraitButton.x+4,portraitButton.y+4,portraitButton.w-8,portraitButton.h-8,104,33,53);
-    label(r,portraitButton.x+18,portraitButton.y+19,
-          portraitMode?"HORIZONTAL":"GIRAR 90",2,255,255,255);
+    // Botao da orientacao segue a visibilidade do HUD durante a leitura.
+    if(!portraitMode && (!(z||textReading)||showReaderHud)){
+        fill(r,portraitButton.x,portraitButton.y,portraitButton.w,portraitButton.h,52,58,76);
+        fill(r,portraitButton.x+4,portraitButton.y+4,portraitButton.w-8,portraitButton.h-8,104,33,53);
+        label(r,portraitButton.x+18,portraitButton.y+19,"GIRAR 90",2);
+    }
     if(portraitMode && portraitFrame){
+        SDL_SetRenderTarget(r,portraitFrame);
+        SDL_SetRenderDrawColor(r,12,14,20,255);SDL_RenderClear(r);
+        if(z||textReading){
+            const int viewH=showReaderHud?1120:1280;
+            SDL_Rect clip{0,0,720,viewH};SDL_RenderSetClipRect(r,&clip);
+            if(tex && iw>0 && ih>0){
+                if(continuous){
+                    float scale=720.f/(float)iw*zoom;
+                    int w=(int)(iw*scale),h=(int)(ih*scale);
+                    SDL_Rect dst{(720-w)/2+(int)panX,-(int)panY,w,h};
+                    SDL_RenderCopy(r,tex,nullptr,&dst);
+                    if(page+1<(int)pages.size() && dst.y+dst.h+20<viewH){
+                        ensureNext();
+                        if(nextTex){float ns=720.f/(float)nextW*zoom;
+                            SDL_Rect nd{(720-(int)(nextW*ns))/2+(int)panX,dst.y+dst.h+20,(int)(nextW*ns),(int)(nextH*ns)};
+                            SDL_RenderCopy(r,nextTex,nullptr,&nd);
+                        }
+                    }
+                }else{
+                    float scale=std::min(720.f/(float)iw,(float)viewH/(float)ih)*zoom;
+                    int w=(int)(iw*scale),h=(int)(ih*scale);
+                    SDL_Rect dst{(720-w)/2+(int)panX,(viewH-h)/2+(int)panY,w,h};
+                    SDL_RenderCopy(r,tex,nullptr,&dst);
+                }
+            }
+            SDL_RenderSetClipRect(r,nullptr);
+            if(showReaderHud){
+                fill(r,0,1120,720,160,27,31,42);
+                fill(r,15,1140,335,75,63,69,83);
+                fill(r,370,1140,335,75,63,69,83);
+                label(r,28,1161,adjacentBook(-1)>=0?"< ANTERIOR":"PRIMEIRO",2);
+                label(r,390,1161,adjacentBook(1)>=0?"PROXIMO >":"ULTIMO",2);
+                label(r,24,1240,std::to_string(page+1)+" / "+std::to_string(pages.size()),1);
+            }
+        }else{
+            // Biblioteca e PIN preservados sem distorcao; layout horizontal centralizado.
+            SDL_Rect scaled{0,437,720,405};
+            SDL_RenderCopy(r,landscapeFrame,nullptr,&scaled);
+        }
+        if(!(z||textReading)||showReaderHud){
+            fill(r,500,40,200,60,104,33,53);
+            label(r,518,59,"HORIZONTAL",2);
+        }
         SDL_SetRenderTarget(r,nullptr);
-        SDL_SetRenderDrawColor(r,0,0,0,255);
-        SDL_RenderClear(r);
-        // O framebuffer da aplicacao gira, sem alterar o sistema do Switch.
-        // Geometria provisoria: o layout interno continua em 1280x720.
+        SDL_SetRenderDrawColor(r,0,0,0,255);SDL_RenderClear(r);
         const SDL_Rect dest{280,-280,720,1280};
         SDL_RenderCopyEx(r,portraitFrame,nullptr,&dest,90.0,nullptr,SDL_FLIP_NONE);
     }
@@ -1418,6 +1506,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     }
     release();
     if(portraitFrame)SDL_DestroyTexture(portraitFrame);
+    if(landscapeFrame)SDL_DestroyTexture(landscapeFrame);
     mark("saida normal");
     if(log)fclose(log);
     clearCovers(covers);if(onlineEnabled){curl_global_cleanup();socketExit();}if(ctl)SDL_GameControllerClose(ctl);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);IMG_Quit();SDL_Quit();return 0;
