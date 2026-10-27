@@ -47,7 +47,7 @@ jobs:
       - name: Publicar build de validacao da v1.0.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-rc-${{ github.run_number }}
+          tag_name: v1.0.0-rc2-${{ github.run_number }}
           name: MangaCAP Switch v1.0.0 - Candidato a lancamento (${{ github.run_number }})
           prerelease: true
           generate_release_notes: false
