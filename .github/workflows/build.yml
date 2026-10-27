@@ -47,13 +47,14 @@ jobs:
       - name: Publicar NRO em Release de teste
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.7.9-teste1-build-${{ github.run_number }}
-          name: MangaCAP Switch v0.7.9 - Teste 1 (build ${{ github.run_number }})
+          tag_name: v0.7.9-teste2-build-${{ github.run_number }}
+          name: MangaCAP Switch v0.7.9 - Teste 2 - Rotacao experimental (build ${{ github.run_number }})
           prerelease: true
           generate_release_notes: false
           body: |
             Compilacao de teste da v0.7.9. Ainda nao validada no Nintendo Switch.
-            Esta versao testa os botoes de navegacao entre capitulos.
-            O modo vertical ainda nao esta implementado.
+            Esta versao testa rotacao de 90 graus apenas no MangaCAP.
+            Layout vertical ainda experimental; a interface pode ficar deformada.
+            Navegacao entre capitulos preservada.
           files: MangaCAP.nro
           fail_on_unmatched_files: true
