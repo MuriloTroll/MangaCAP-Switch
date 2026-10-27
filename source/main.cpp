@@ -800,27 +800,46 @@ static void labelBold(SDL_Renderer*r,int x,int y,const std::string& text,
     label(r,x,y,text,1,red,green,blue);
     label(r,x+1,y,text,1,red,green,blue);
 }
-// Icone vetorial de rotacao: arco circular e seta, sem fontes ou assets extras.
+// Botao de rotacao com visual discreto; area de toque mantida no codigo existente.
+static void roundedFill(SDL_Renderer* r,int x,int y,int w,int h,int rad,Uint8 R,Uint8 G,Uint8 B){
+    SDL_SetRenderDrawColor(r,R,G,B,255);
+    for(int yy=0;yy<h;yy++){
+        int inset=0;
+        if(yy<rad || yy>=h-rad){
+            int d=(yy<rad)?rad-yy-1:yy-(h-rad);
+            inset=rad-(int)std::sqrt((double)(rad*rad-d*d));
+        }
+        SDL_Rect line{x+inset,y+yy,w-2*inset,1};SDL_RenderFillRect(r,&line);
+    }
+}
 static void drawRotateIcon(SDL_Renderer* r,int cx,int cy,int radius){
-    SDL_SetRenderDrawColor(r,245,245,248,255);
+    // Simbolo de atualizar/rotacionar: arco continuo e seta tangente no alto.
     const float pi=3.14159265358979323846f;
-    // Arco horario de aproximadamente 300 graus, com abertura junto a seta.
-    for(int t=0;t<3;t++){
-        int rr=radius-t;
-        for(int deg=-145;deg<145;deg+=3){
-            float a=deg*pi/180.f,b=(deg+3)*pi/180.f;
+    SDL_SetRenderDrawColor(r,244,246,250,255);
+    // Arco de 250 graus, de -55 a 195, com espessura 3 px.
+    for(int thick=-1;thick<=1;thick++){
+        const int rr=radius+thick;
+        for(int deg=-55;deg<195;deg+=2){
+            float a=deg*pi/180.f,b=(deg+2)*pi/180.f;
             SDL_RenderDrawLine(r,cx+(int)std::lround(rr*std::cos(a)),cy+(int)std::lround(rr*std::sin(a)),
                 cx+(int)std::lround(rr*std::cos(b)),cy+(int)std::lround(rr*std::sin(b)));
         }
     }
-    // Ponta de seta no final do arco.
-    float a=145.f*pi/180.f;
+    // Seta simples e simetrica no inicio do arco (sem ponta desalinhada).
+    const float a=-55.f*pi/180.f;
     int ex=cx+(int)std::lround(radius*std::cos(a));
     int ey=cy+(int)std::lround(radius*std::sin(a));
-    SDL_RenderDrawLine(r,ex,ey,ex+17,ey-2);
-    SDL_RenderDrawLine(r,ex,ey,ex+5,ey-16);
-    SDL_RenderDrawLine(r,ex+1,ey,ex+18,ey-2);
-    SDL_RenderDrawLine(r,ex+1,ey,ex+6,ey-16);
+    for(int t=-1;t<=1;t++){
+        SDL_RenderDrawLine(r,ex+t,ey,ex-13+t,ey-3);
+        SDL_RenderDrawLine(r,ex+t,ey,ex+1+t,ey-13);
+    }
+}
+static void drawRotateButton(SDL_Renderer* r,int x,int y,int w,int h){
+    // Mantem a area de clique antiga, mas desenha um botao compacto centralizado.
+    const int bw=76,bh=54,bx=x+(w-bw)/2,by=y+(h-bh)/2;
+    roundedFill(r,bx,by,bw,bh,13,44,49,63);
+    roundedFill(r,bx+2,by+2,bw-4,bh-4,11,34,39,52);
+    drawRotateIcon(r,bx+bw/2,by+bh/2,16);
 }
 
 int main(int argc,char**argv){(void)argc;(void)argv;
@@ -1480,9 +1499,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     if(!message.empty()){fill(r,0,626,1280,42,128,24,40);label(r,30,634,message,2);}
     // Botao da orientacao segue a visibilidade do HUD durante a leitura.
     if(!portraitMode && (!(z||textReading)||showReaderHud)){
-        fill(r,portraitButton.x,portraitButton.y,portraitButton.w,portraitButton.h,52,58,76);
-        fill(r,portraitButton.x+4,portraitButton.y+4,portraitButton.w-8,portraitButton.h-8,104,33,53);
-        drawRotateIcon(r,portraitButton.x+portraitButton.w/2,portraitButton.y+portraitButton.h/2,21);
+        drawRotateButton(r,portraitButton.x,portraitButton.y,portraitButton.w,portraitButton.h);
     }
     if(portraitMode && portraitFrame){
         SDL_SetRenderTarget(r,portraitFrame);
@@ -1525,8 +1542,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             SDL_RenderCopy(r,landscapeFrame,nullptr,&scaled);
         }
         if(!(z||textReading)||showReaderHud){
-            fill(r,500,40,200,60,104,33,53);
-            drawRotateIcon(r,600,70,21);
+            drawRotateButton(r,500,40,200,60);
         }
         SDL_SetRenderTarget(r,nullptr);
         SDL_SetRenderDrawColor(r,0,0,0,255);SDL_RenderClear(r);
