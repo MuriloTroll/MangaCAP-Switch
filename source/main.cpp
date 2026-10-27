@@ -813,32 +813,36 @@ static void roundedFill(SDL_Renderer* r,int x,int y,int w,int h,int rad,Uint8 R,
     }
 }
 static void drawRotateIcon(SDL_Renderer* r,int cx,int cy,int radius){
-    // Simbolo de atualizar/rotacionar: arco continuo e seta tangente no alto.
+    // Arco e ponta tangente no MESMO sentido (horario nas coordenadas SDL).
     const float pi=3.14159265358979323846f;
-    SDL_SetRenderDrawColor(r,244,246,250,255);
-    // Arco de 250 graus, de -55 a 195, com espessura 3 px.
+    SDL_SetRenderDrawColor(r,248,248,250,255);
+    const int first=-55, last=195;
     for(int thick=-1;thick<=1;thick++){
         const int rr=radius+thick;
-        for(int deg=-55;deg<195;deg+=2){
-            float a=deg*pi/180.f,b=(deg+2)*pi/180.f;
+        for(int deg=first;deg<last;deg+=2){
+            const float a=deg*pi/180.f,b=(deg+2)*pi/180.f;
             SDL_RenderDrawLine(r,cx+(int)std::lround(rr*std::cos(a)),cy+(int)std::lround(rr*std::sin(a)),
                 cx+(int)std::lround(rr*std::cos(b)),cy+(int)std::lround(rr*std::sin(b)));
         }
     }
-    // Seta simples e simetrica no inicio do arco (sem ponta desalinhada).
-    const float a=-55.f*pi/180.f;
-    int ex=cx+(int)std::lround(radius*std::cos(a));
-    int ey=cy+(int)std::lround(radius*std::sin(a));
-    for(int t=-1;t<=1;t++){
-        SDL_RenderDrawLine(r,ex+t,ey,ex-13+t,ey-3);
-        SDL_RenderDrawLine(r,ex+t,ey,ex+1+t,ey-13);
+    // No fim do arco, tangente = (-sin(a),cos(a)); a ponta aponta nessa direcao.
+    const float a=last*pi/180.f;
+    const float tx=-std::sin(a),ty=std::cos(a);
+    const float nx=-ty,ny=tx;
+    const float ex=cx+radius*std::cos(a),ey=cy+radius*std::sin(a);
+    const float bx=ex-10.f*tx,by=ey-10.f*ty;
+    for(int offset=-1;offset<=1;offset++){
+        SDL_RenderDrawLine(r,(int)std::lround(ex+offset*nx),(int)std::lround(ey+offset*ny),
+            (int)std::lround(bx+6.f*nx+offset*nx),(int)std::lround(by+6.f*ny+offset*ny));
+        SDL_RenderDrawLine(r,(int)std::lround(ex+offset*nx),(int)std::lround(ey+offset*ny),
+            (int)std::lround(bx-6.f*nx+offset*nx),(int)std::lround(by-6.f*ny+offset*ny));
     }
 }
 static void drawRotateButton(SDL_Renderer* r,int x,int y,int w,int h){
-    // Mantem a area de clique antiga, mas desenha um botao compacto centralizado.
+    // Mesmo tamanho e hitbox do Teste 5; volta a paleta vinho do Teste 4.
     const int bw=76,bh=54,bx=x+(w-bw)/2,by=y+(h-bh)/2;
-    roundedFill(r,bx,by,bw,bh,13,44,49,63);
-    roundedFill(r,bx+2,by+2,bw-4,bh-4,11,34,39,52);
+    roundedFill(r,bx,by,bw,bh,13,127,28,57);
+    roundedFill(r,bx+2,by+2,bw-4,bh-4,11,153,31,67);
     drawRotateIcon(r,bx+bw/2,by+bh/2,16);
 }
 
