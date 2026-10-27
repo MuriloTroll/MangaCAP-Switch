@@ -1527,21 +1527,21 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             int x=36+col*244,y=174+row*285-libraryHorizontalScroll;
             int bookIndex=libraryScreen==0?works[idx].volumes.front():works[selected].volumes[idx];
             bool active=idx==(libraryScreen==0?selected:selectedVolume);
-            fill(r,x-3,y-3,218,230,active?213:30,active?60:31,active?77:39);
-            fill(r,x,y,212,224,7,8,12);
+            fill(r,x-3,y-3,234,246,active?213:30,active?60:31,active?77:39);
+            fill(r,x,y,228,240,7,8,12);
             Cover*c=coverAt(bookIndex,libraryScreen==0?works[idx].title:books[bookIndex].name,libraryScreen==0,libraryScreen==0?idx:selected);
-            if(c&&c->tex)drawCover(r,c->tex,c->w,c->h,x,y,212,224);
-            else label(r,x+42,y+100,"SEM CAPA",1,170,170,182);
+            if(c&&c->tex)drawCover(r,c->tex,c->w,c->h,x,y,228,240);
+            else label(r,x+50,y+105,"SEM CAPA",1,170,170,182);
             std::string title=libraryScreen==0?cleanLibraryWorkTitle(works[idx].title):stripExtension(books[bookIndex].name);
-            labelMedium(r,x,y+234,compactTitle(title,17));
+            labelMedium(r,x,y+246,compactTitle(title,19));
             if(libraryScreen!=0){
                 int total=totalPages(books[bookIndex].path);
                 int saved=std::max(0,getSaved(books[bookIndex].path));
                 int current=total>0?std::min(total,saved+1):saved+1;
                 int percent=total>0?(int)(100.f*current/total+.5f):0;
-                label(r,x,y+257,"PAG. "+std::to_string(current)+(total>0?" / "+std::to_string(total):""),1,177,183,195);
-                fill(r,x,y+273,212,5,54,58,65);
-                if(total>0)fill(r,x,y+273,(int)(212.f*percent/100.f),5,58,199,106);
+                label(r,x,y+266,"PAG. "+std::to_string(current)+(total>0?" / "+std::to_string(total):""),1,177,183,195);
+                fill(r,x,y+279,228,5,54,58,65);
+                if(total>0)fill(r,x,y+279,(int)(228.f*percent/100.f),5,58,199,106);
             }
         }
         SDL_RenderSetClipRect(r,nullptr);
@@ -1586,6 +1586,10 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         }
         SDL_RenderSetClipRect(r,nullptr);
         if(showReaderHud){
+            if(activeBook>=0 && activeBook<(int)books.size()){
+                fill(r,0,0,1280,42,20,23,32);
+                label(r,20,10,"LENDO: "+compactTitle(books[activeBook].name,75),1,245,245,248);
+            }
             if(!pages.empty()){
                 fill(r,260,625,760,62,27,31,42);
                 fill(r,275,634,342,44,63,69,83);
@@ -1635,6 +1639,10 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             }
             SDL_RenderSetClipRect(r,nullptr);
             if(showReaderHud){
+                if(activeBook>=0 && activeBook<(int)books.size()){
+                    fill(r,0,0,720,36,20,23,32);
+                    label(r,12,9,"LENDO: "+compactTitle(books[activeBook].name,43),1,245,245,248);
+                }
                 fill(r,0,1120,720,160,27,31,42);
                 fill(r,15,1140,335,75,63,69,83);
                 fill(r,370,1140,335,75,63,69,83);
@@ -1658,13 +1666,13 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 int x=20+col*230,y=195+row*340-libraryPortraitScroll;
                 int bookIndex=libraryScreen==0?works[idx].volumes.front():works[selected].volumes[idx];
                 bool active=idx==(libraryScreen==0?selected:selectedVolume);
-                fill(r,x-3,y-3,216,287,active?213:30,active?60:31,active?77:39);
-                fill(r,x,y,210,280,7,8,12);
+                fill(r,x-3,y-3,222,295,active?213:30,active?60:31,active?77:39);
+                fill(r,x,y,216,288,7,8,12);
                 Cover*c=coverAt(bookIndex,libraryScreen==0?works[idx].title:books[bookIndex].name,libraryScreen==0,libraryScreen==0?idx:selected);
-                if(c&&c->tex)drawCover(r,c->tex,c->w,c->h,x,y,210,280);
+                if(c&&c->tex)drawCover(r,c->tex,c->w,c->h,x,y,216,288);
                 else label(r,x+45,y+120,"SEM CAPA",1,170,170,182);
                 std::string title=libraryScreen==0?cleanLibraryWorkTitle(works[idx].title):stripExtension(books[bookIndex].name);
-                labelMedium(r,x,y+290,compactTitle(title,17));
+                labelMedium(r,x,y+299,compactTitle(title,18));
             }
             SDL_RenderSetClipRect(r,nullptr);
             {
