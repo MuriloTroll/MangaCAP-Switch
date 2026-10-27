@@ -5,6 +5,7 @@
 #include "pdf_convert.h"
 #include "font.h"
 #include "rotate_cw_png.h"
+#include "arrow_up_png.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -826,6 +827,26 @@ static SDL_Texture* rotateIconTexture(SDL_Renderer* r){
     }
     return icon;
 }
+static SDL_Texture* upIconTexture(SDL_Renderer* r){
+    static SDL_Texture* icon=nullptr;static SDL_Renderer* owner=nullptr;
+    if(owner!=r){icon=nullptr;owner=r;}
+    if(!icon){
+        SDL_RWops* rw=SDL_RWFromConstMem(ARROW_UP_PNG,(int)ARROW_UP_PNG_SIZE);
+        SDL_Surface* surface=rw?IMG_Load_RW(rw,1):nullptr;
+        if(surface){icon=SDL_CreateTextureFromSurface(r,surface);SDL_FreeSurface(surface);}
+        if(icon)SDL_SetTextureBlendMode(icon,SDL_BLENDMODE_BLEND);
+    }
+    return icon;
+}
+static void drawTopButton(SDL_Renderer* r,int x,int y,int w,int h){
+    const int bw=76,bh=54,bx=x+(w-bw)/2,by=y+(h-bh)/2;
+    roundedFill(r,bx,by,bw,bh,13,127,28,57);
+    roundedFill(r,bx+2,by+2,bw-4,bh-4,11,153,31,67);
+    if(SDL_Texture* icon=upIconTexture(r)){
+        const SDL_Rect dst{bx+(bw-40)/2,by+(bh-40)/2,40,40};
+        SDL_RenderCopy(r,icon,nullptr,&dst);
+    }
+}
 static void drawRotateButton(SDL_Renderer* r,int x,int y,int w,int h){
     // Mesmo tamanho e hitbox do Teste 5; volta a paleta vinho do Teste 4.
     const int bw=76,bh=54,bx=x+(w-bw)/2,by=y+(h-bh)/2;
@@ -852,6 +873,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     if(portraitFrame)SDL_SetTextureBlendMode(portraitFrame,SDL_BLENDMODE_NONE);
     bool portraitMode=false;
     const SDL_Rect portraitButton{1050,112,210,62};
+    const SDL_Rect topButton{850,112,200,62};
+    const SDL_Rect portraitTopButton{300,40,200,60};
     auto togglePortrait=[&](){
         if(!portraitFrame || !landscapeFrame){mark("Rotacao indisponivel: sem textura de destino");return;}
         portraitMode=!portraitMode;
@@ -1002,6 +1025,21 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         selected=0;selectedVolume=0;libraryScreen=0;activeBook=-1;
         refreshCovers();coverTried.clear();pageCountCache.clear();
     };
+    auto goTop=[&](){
+        if(page!=0){
+            page=0;load();
+            if(activeBook>=0&&activeBook<(int)books.size())save(books[activeBook].path,page);
+        }
+        panX=0.f;
+        if(continuous)panY=0.f;
+        else if(iw>0 && ih>0){
+            const float viewH=portraitMode?(showReaderHud?1120.f:1280.f):(showReaderHud?697.f:720.f);
+            const float viewW=portraitMode?720.f:1280.f;
+            const float scale=std::min(viewW/(float)iw,viewH/(float)ih)*zoom;
+            panY=std::max(0.f,(ih*scale-viewH)*.5f);
+        }
+        showReaderHud=false;
+    };
     bool touchDragging=false, touchMoved=false;
     SDL_FingerID activeFinger=0;
     float touchStartX=0, touchStartY=0, touchLastX=0, touchLastY=0;
@@ -1057,6 +1095,10 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 }
                 // As demais areas de toque continuam usando as coordenadas originais.
                 if(portraitMode && (z||textReading)){
+                    if(showReaderHud && pt.x>=portraitTopButton.x && pt.x<portraitTopButton.x+portraitTopButton.w &&
+                       pt.y>=portraitTopButton.y && pt.y<portraitTopButton.y+portraitTopButton.h){
+                        goTop();continue;
+                    }
                     // Botao de capitulo no rodape do layout retrato.
                     if(showReaderHud && pt.y>=1130.f && pt.y<=1220.f){
                         int target=adjacentBook(pt.x<360.f?-1:1);
@@ -1133,24 +1175,9 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                     }
                     continue;
                 }
-                if(showReaderHud && touchX>=1100.f && touchY>=18.f &&
-                   touchX<=1260.f && touchY<=78.f){
-                    if(page!=0){
-                        page=0;
-                        load();
-                        if(activeBook>=0&&activeBook<(int)books.size())
-                            save(books[activeBook].path,page);
-                    }
-                    panX=0.f;
-                    if(continuous){
-                        panY=0.f;
-                    }else{
-                        const float viewH=showReaderHud?697.f:720.f;
-                        const float scale=std::min(1280.f/(float)iw,viewH/(float)ih)*zoom;
-                        // No modo pagina, deslocamento positivo mostra o topo.
-                        panY=std::max(0.f,(ih*scale-viewH)*.5f);
-                    }
-                    showReaderHud=false;
+                if(showReaderHud && touchX>=topButton.x && touchY>=topButton.y &&
+                   touchX<topButton.x+topButton.w && touchY<topButton.y+topButton.h){
+                    goTop();
                 }else{
                     showReaderHud=!showReaderHud;
                 }
@@ -1481,9 +1508,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 label(r,687,645,adjacentBook(1)>=0?"PROXIMO >":"EM DIA COM A OBRA",2);
             }
             // Botao flutuante visivel somente com a interface de leitura.
-            fill(r,1100,18,160,60,116,18,34);
-            fill(r,1104,22,152,52,163,30,52);
-            label(r,1134,36,"^ TOPO",2);
+            drawTopButton(r,topButton.x,topButton.y,topButton.w,topButton.h);
             fill(r,0,697,1280,23,28,29,38);
             fill(r,0,713,(int)(1280.f*(page+1)/pages.size()),7,218,41,58);
             label(r,16,698,std::to_string(page+1)+" / "+std::to_string(pages.size())+
@@ -1537,6 +1562,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             SDL_RenderCopy(r,landscapeFrame,nullptr,&scaled);
         }
         if(!(z||textReading)||showReaderHud){
+            if((z||textReading) && showReaderHud)
+                drawTopButton(r,portraitTopButton.x,portraitTopButton.y,portraitTopButton.w,portraitTopButton.h);
             drawRotateButton(r,500,40,200,60);
         }
         SDL_SetRenderTarget(r,nullptr);
