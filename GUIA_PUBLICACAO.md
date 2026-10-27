@@ -11,3 +11,5 @@
 9. Após publicar, verifique o link da Release, o download do `.nro` e a instrução da pasta `books`.
 
 **Atenção:** este pacote contém somente materiais de apresentação/documentação. Ele não recompila o programa, não publica a Release automaticamente e não altera o código do RC3.
+
+10. Para oferecer um manual separado, adicione `GUIA_INICIANTE.md` na raiz do repositório. O `README.md` deste kit já contém o manual completo.
