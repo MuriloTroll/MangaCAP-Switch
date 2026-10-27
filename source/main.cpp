@@ -1047,7 +1047,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     float touchStartX=0, touchStartY=0, touchLastX=0, touchLastY=0;
     auto portraitLibraryCount=[&]()->int{return libraryScreen==0?(int)works.size():(works.empty()?0:(int)works[selected].volumes.size());};
     auto portraitLibraryMaxScroll=[&]()->int{int rows=(portraitLibraryCount()+2)/3;return std::max(0,rows*340-1000);};
-    auto horizontalLibraryMaxScroll=[&]()->int{int rows=(portraitLibraryCount()+4)/5;return std::max(0,rows*285-460);};
+    auto horizontalLibraryMaxScroll=[&]()->int{int rows=(portraitLibraryCount()+2)/3;return std::max(0,rows*455-460);};
     auto logicalTouch=[&](float px,float py)->SDL_FPoint{
         if(!portraitMode)return SDL_FPoint{px*1280.f,py*720.f};
         float x=py*720.f,y=(1.f-px)*1280.f;
@@ -1128,10 +1128,10 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                         if(touchMoved)continue;
                         if(hy>=112.f && hy<165.f && libraryScreen==1){libraryScreen=0;libraryHorizontalScroll=0;continue;}
                         if(hy>=165.f && hy<655.f && hx>=36.f && hx<1260.f){
-                            int col=((int)hx-36)/244;
-                            int row=((int)hy-174+libraryHorizontalScroll)/285;
-                            if(col>=0&&col<5&&row>=0){
-                                int idx=row*5+col;
+                            int col=((int)hx-36)/410;
+                            int row=((int)hy-174+libraryHorizontalScroll)/455;
+                            if(col>=0&&col<3&&row>=0 && ((int)hx-36)%410<360){
+                                int idx=row*3+col;
                                 if(idx<portraitLibraryCount()){
                                     if(libraryScreen==0){selected=idx;selectedVolume=resumeVolume(selected);libraryScreen=1;libraryHorizontalScroll=0;}
                                     else{selectedVolume=idx;openBook(works[selected].volumes[idx]);}
@@ -1260,28 +1260,6 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 }else{
                     showReaderHud=!showReaderHud;
                 }
-            }else if(libraryScreen==0 && !works.empty()){
-                // 4 colunas, 2 linhas. Toque no cartao abre volumes.
-                int x=(int)(ev.tfinger.x*1280.f),y=(int)(ev.tfinger.y*720.f);
-                if(y>=164 && y<604 && x>=36 && x<1256){
-                    int col=(x-36)/244,row=0;
-                    int first=(selected/5)*5;
-                    int idx=first+row*5+col;
-                    if(col>=0 && col<5 && row<1 && idx<(int)works.size()){
-                        selected=idx;selectedVolume=resumeVolume(selected);libraryScreen=1;
-                    }
-                }
-            }else if(libraryScreen==1 && !works.empty()){
-                int x=(int)(ev.tfinger.x*1280.f),y=(int)(ev.tfinger.y*720.f);
-                if(y<100){libraryScreen=0;}
-                else if(y>=164 && y<604 && x>=36 && x<1256){
-                    int col=(x-36)/244,row=0;
-                    int first=(selectedVolume/5)*5;
-                    int idx=first+row*5+col;
-                    if(col>=0 && col<5 && row<1 && idx<(int)works[selected].volumes.size()){
-                        selectedVolume=idx;openBook(works[selected].volumes[idx]);
-                    }
-                }
             }
             continue;
         }
@@ -1365,15 +1343,15 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             int count=libraryScreen==0?(int)works.size():(works.empty()?0:(int)works[selected].volumes.size());
             int& pos=libraryScreen==0?selected:selectedVolume;
             if(count>0){
-                int navCols=portraitMode?3:5;
+                int navCols=3;
                 if(b==SDL_CONTROLLER_BUTTON_DPAD_RIGHT||k==SDLK_RIGHT)pos=std::min(count-1,pos+1);
                 if(b==SDL_CONTROLLER_BUTTON_DPAD_LEFT||k==SDLK_LEFT)pos=std::max(0,pos-1);
                 if(b==SDL_CONTROLLER_BUTTON_DPAD_DOWN||k==SDLK_DOWN)pos=std::min(count-1,pos+navCols);
                 if(b==SDL_CONTROLLER_BUTTON_DPAD_UP||k==SDLK_UP)pos=std::max(0,pos-navCols);
                 if(!portraitMode){
-                    int y=(pos/5)*285;
+                    int y=(pos/3)*455;
                     if(y<libraryHorizontalScroll)libraryHorizontalScroll=y;
-                    if(y+275>libraryHorizontalScroll+460)libraryHorizontalScroll=y+275-460;
+                    if(y+445>libraryHorizontalScroll+460)libraryHorizontalScroll=y+445-460;
                     libraryHorizontalScroll=std::max(0,std::min(horizontalLibraryMaxScroll(),libraryHorizontalScroll));
                 }
                 if(portraitMode){
@@ -1507,7 +1485,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             if(!securityNotice.empty())label(r,820,640,securityNotice,1,240,90,90);
         }
     }else if(!z&&!textReading){
-        // Biblioteca horizontal em grade: 5 colunas, varias linhas e rolagem vertical.
+        // Biblioteca horizontal em grade: 3 colunas de capas grandes, rolagem vertical.
         fill(r,0,0,1280,112,16,17,23);
         fill(r,0,108,1280,3,192,43,61);
         label(r,36,20,"MangaCAP",3,245,245,248);
@@ -1520,28 +1498,28 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         int count=portraitLibraryCount();
         if(count==0)label(r,55,290,"Copie EPUB/TXT/PDF/CBZ para /switch/MangaCAP/books",2);
         SDL_Rect libraryClip{0,170,1280,485};SDL_RenderSetClipRect(r,&libraryClip);
-        int first=std::max(0,(libraryHorizontalScroll/285)*5);
-        int last=std::min(count,first+20);
+        int first=std::max(0,(libraryHorizontalScroll/455)*3);
+        int last=std::min(count,first+12);
         for(int idx=first;idx<last;idx++){
-            int col=idx%5,row=idx/5;
-            int x=36+col*244,y=174+row*285-libraryHorizontalScroll;
+            int col=idx%3,row=idx/3;
+            int x=36+col*410,y=174+row*455-libraryHorizontalScroll;
             int bookIndex=libraryScreen==0?works[idx].volumes.front():works[selected].volumes[idx];
             bool active=idx==(libraryScreen==0?selected:selectedVolume);
-            fill(r,x-3,y-3,234,246,active?213:30,active?60:31,active?77:39);
-            fill(r,x,y,228,240,7,8,12);
+            fill(r,x-3,y-3,366,402,active?213:30,active?60:31,active?77:39);
+            fill(r,x,y,360,396,7,8,12);
             Cover*c=coverAt(bookIndex,libraryScreen==0?works[idx].title:books[bookIndex].name,libraryScreen==0,libraryScreen==0?idx:selected);
-            if(c&&c->tex)drawCover(r,c->tex,c->w,c->h,x,y,228,240);
-            else label(r,x+50,y+105,"SEM CAPA",1,170,170,182);
+            if(c&&c->tex)drawCover(r,c->tex,c->w,c->h,x,y,360,396);
+            else label(r,x+110,y+175,"SEM CAPA",1,170,170,182);
             std::string title=libraryScreen==0?cleanLibraryWorkTitle(works[idx].title):stripExtension(books[bookIndex].name);
-            labelMedium(r,x,y+246,compactTitle(title,19));
+            labelMedium(r,x,y+402,compactTitle(title,28));
             if(libraryScreen!=0){
                 int total=totalPages(books[bookIndex].path);
                 int saved=std::max(0,getSaved(books[bookIndex].path));
                 int current=total>0?std::min(total,saved+1):saved+1;
                 int percent=total>0?(int)(100.f*current/total+.5f):0;
-                label(r,x,y+266,"PAG. "+std::to_string(current)+(total>0?" / "+std::to_string(total):""),1,177,183,195);
-                fill(r,x,y+279,228,5,54,58,65);
-                if(total>0)fill(r,x,y+279,(int)(228.f*percent/100.f),5,58,199,106);
+                label(r,x,y+424,"PAG. "+std::to_string(current)+(total>0?" / "+std::to_string(total):""),1,177,183,195);
+                fill(r,x,y+438,360,5,54,58,65);
+                if(total>0)fill(r,x,y+438,(int)(360.f*percent/100.f),5,58,199,106);
             }
         }
         SDL_RenderSetClipRect(r,nullptr);
