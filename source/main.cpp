@@ -800,6 +800,29 @@ static void labelBold(SDL_Renderer*r,int x,int y,const std::string& text,
     label(r,x,y,text,1,red,green,blue);
     label(r,x+1,y,text,1,red,green,blue);
 }
+// Icone vetorial de rotacao: arco circular e seta, sem fontes ou assets extras.
+static void drawRotateIcon(SDL_Renderer* r,int cx,int cy,int radius){
+    SDL_SetRenderDrawColor(r,245,245,248,255);
+    const float pi=3.14159265358979323846f;
+    // Arco horario de aproximadamente 300 graus, com abertura junto a seta.
+    for(int t=0;t<3;t++){
+        int rr=radius-t;
+        for(int deg=-145;deg<145;deg+=3){
+            float a=deg*pi/180.f,b=(deg+3)*pi/180.f;
+            SDL_RenderDrawLine(r,cx+(int)std::lround(rr*std::cos(a)),cy+(int)std::lround(rr*std::sin(a)),
+                cx+(int)std::lround(rr*std::cos(b)),cy+(int)std::lround(rr*std::sin(b)));
+        }
+    }
+    // Ponta de seta no final do arco.
+    float a=145.f*pi/180.f;
+    int ex=cx+(int)std::lround(radius*std::cos(a));
+    int ey=cy+(int)std::lround(radius*std::sin(a));
+    SDL_RenderDrawLine(r,ex,ey,ex+17,ey-2);
+    SDL_RenderDrawLine(r,ex,ey,ex+5,ey-16);
+    SDL_RenderDrawLine(r,ex+1,ey,ex+18,ey-2);
+    SDL_RenderDrawLine(r,ex+1,ey,ex+6,ey-16);
+}
+
 int main(int argc,char**argv){(void)argc;(void)argv;
     // Log de diagnóstico antes de inicializar os componentes gráficos.
     mkdir(ROOT,0777);FILE* log=fopen("sdmc:/switch/MangaCAP/startup.log","w");
@@ -978,6 +1001,17 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         if(ev.type==SDL_QUIT){running=false;break;}
         if(ev.type==SDL_KEYDOWN && ev.key.keysym.sym==SDLK_F9){togglePortrait();continue;}
         if(ev.type==SDL_FINGERDOWN || ev.type==SDL_FINGERMOTION || ev.type==SDL_FINGERUP){
+            // No retrato, a biblioteca e desenhada em uma textura horizontal
+            // reduzida, mas o botao de rotacao e desenhado na textura vertical.
+            // Testar esse botao com coordenadas verticais ANTES de remapear
+            // os demais toques para a biblioteca evita perder a area clicavel.
+            const float portraitX=ev.tfinger.y*720.f;
+            const float portraitY=(1.f-ev.tfinger.x)*1280.f;
+            if(ev.type==SDL_FINGERDOWN && portraitMode && !(z||textReading) &&
+               portraitX>=500.f && portraitX<700.f &&
+               portraitY>=40.f && portraitY<100.f){
+                togglePortrait();continue;
+            }
             SDL_FPoint pt=logicalTouch(ev.tfinger.x,ev.tfinger.y);
             if(ev.type==SDL_FINGERDOWN){
                 touchDragging=(z||textReading);touchMoved=false;activeFinger=ev.tfinger.fingerId;
@@ -1448,7 +1482,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     if(!portraitMode && (!(z||textReading)||showReaderHud)){
         fill(r,portraitButton.x,portraitButton.y,portraitButton.w,portraitButton.h,52,58,76);
         fill(r,portraitButton.x+4,portraitButton.y+4,portraitButton.w-8,portraitButton.h-8,104,33,53);
-        label(r,portraitButton.x+18,portraitButton.y+19,"GIRAR 90",2);
+        drawRotateIcon(r,portraitButton.x+portraitButton.w/2,portraitButton.y+portraitButton.h/2,21);
     }
     if(portraitMode && portraitFrame){
         SDL_SetRenderTarget(r,portraitFrame);
@@ -1492,7 +1526,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         }
         if(!(z||textReading)||showReaderHud){
             fill(r,500,40,200,60,104,33,53);
-            label(r,518,59,"HORIZONTAL",2);
+            drawRotateIcon(r,600,70,21);
         }
         SDL_SetRenderTarget(r,nullptr);
         SDL_SetRenderDrawColor(r,0,0,0,255);SDL_RenderClear(r);
