@@ -808,6 +808,17 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     IMG_Init(IMG_INIT_JPG|IMG_INIT_PNG|IMG_INIT_WEBP);mark("IMG init");
     SDL_Window*win=SDL_CreateWindow("MangaCAP Switch",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,1280,720,SDL_WINDOW_SHOWN);if(!win){mark(SDL_GetError());return 1;}
     SDL_Renderer*r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED);if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);if(!r){mark(SDL_GetError());return 1;}mark("renderer OK");
+    // Teste 2: renderizacao isolada em textura para rotacao somente do aplicativo.
+    SDL_Texture*portraitFrame=SDL_CreateTexture(r,SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET,1280,720);
+    if(portraitFrame)SDL_SetTextureBlendMode(portraitFrame,SDL_BLENDMODE_NONE);
+    bool portraitMode=false;
+    const SDL_Rect portraitButton{1050,112,210,62};
+    auto togglePortrait=[&](){
+        if(!portraitFrame){mark("Rotacao indisponivel: sem textura de destino");return;}
+        portraitMode=!portraitMode;
+        mark(portraitMode?"Modo retrato ativado":"Modo horizontal ativado");
+    };
     SDL_GameController*ctl=nullptr;for(int i=0;i<SDL_NumJoysticks();i++)if(SDL_IsGameController(i)){ctl=SDL_GameControllerOpen(i);break;}
     // Inicializa rede somente para busca opcional de capas.
     bool onlineEnabled=(socketInitializeDefault()==0);
@@ -955,6 +966,22 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     };
     bool running=true;while(running){SDL_Event ev;while(SDL_PollEvent(&ev)){
         if(ev.type==SDL_QUIT){running=false;break;}
+        // Converte toques fisicos para as coordenadas da interface original.
+        // Rotacao de 90 graus no sentido horario, exclusiva do framebuffer SDL.
+        if(portraitMode && (ev.type==SDL_FINGERDOWN || ev.type==SDL_FINGERMOTION || ev.type==SDL_FINGERUP)){
+            const float px=ev.tfinger.x,py=ev.tfinger.y;
+            ev.tfinger.x=py;
+            ev.tfinger.y=1.f-px;
+        }
+        if(ev.type==SDL_KEYDOWN && ev.key.keysym.sym==SDLK_F9){togglePortrait();continue;}
+        if(ev.type==SDL_FINGERDOWN){
+            const int tx=(int)(ev.tfinger.x*1280.f),ty=(int)(ev.tfinger.y*720.f);
+            if(tx>=portraitButton.x && tx<portraitButton.x+portraitButton.w &&
+               ty>=portraitButton.y && ty<portraitButton.y+portraitButton.h){
+                togglePortrait();continue;
+            }
+        }
+
         // Toque revela os controles. Com controles visiveis, tocar em
         // "TOPO" retorna ao inicio do volume; outros toques ocultam.
         if(ev.type==SDL_FINGERDOWN && securityScreen){
@@ -1223,6 +1250,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             panY=std::max(-maxY,std::min(maxY,panY-axisY*10.f));
         }
     }
+    if(portraitMode && portraitFrame)SDL_SetRenderTarget(r,portraitFrame);
     fill(r,0,0,1280,720,12,14,20);
     if(securityScreen){
         fill(r,0,0,1280,720,12,14,20);
@@ -1369,12 +1397,27 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         }
     }
     if(!message.empty()){fill(r,0,626,1280,42,128,24,40);label(r,30,634,message,2);}
+    // Botao global, inclusive na biblioteca, leitor e PIN.
+    fill(r,portraitButton.x,portraitButton.y,portraitButton.w,portraitButton.h,52,58,76);
+    fill(r,portraitButton.x+4,portraitButton.y+4,portraitButton.w-8,portraitButton.h-8,104,33,53);
+    label(r,portraitButton.x+18,portraitButton.y+19,
+          portraitMode?"HORIZONTAL":"GIRAR 90",2,255,255,255);
+    if(portraitMode && portraitFrame){
+        SDL_SetRenderTarget(r,nullptr);
+        SDL_SetRenderDrawColor(r,0,0,0,255);
+        SDL_RenderClear(r);
+        // O framebuffer da aplicacao gira, sem alterar o sistema do Switch.
+        // Geometria provisoria: o layout interno continua em 1280x720.
+        const SDL_Rect dest{280,-280,720,1280};
+        SDL_RenderCopyEx(r,portraitFrame,nullptr,&dest,90.0,nullptr,SDL_FLIP_NONE);
+    }
     SDL_RenderPresent(r);SDL_Delay(16);
     }
     if((z||textReading)&&activeBook>=0&&activeBook<(int)books.size()) {
         save(books[activeBook].path,page);
     }
     release();
+    if(portraitFrame)SDL_DestroyTexture(portraitFrame);
     mark("saida normal");
     if(log)fclose(log);
     clearCovers(covers);if(onlineEnabled){curl_global_cleanup();socketExit();}if(ctl)SDL_GameControllerClose(ctl);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);IMG_Quit();SDL_Quit();return 0;
