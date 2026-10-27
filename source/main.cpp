@@ -7,6 +7,7 @@
 #include "rotate_cw_png.h"
 #include "arrow_up_png.h"
 #include "pix_qr_png.h"
+#include "heart_png.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -869,16 +870,27 @@ static SDL_Texture* pixQrTexture(SDL_Renderer* r){
     }
     return icon;
 }
+static SDL_Texture* heartIconTexture(SDL_Renderer* r){
+    static SDL_Texture* icon=nullptr;static SDL_Renderer* owner=nullptr;
+    if(owner!=r){icon=nullptr;owner=r;}
+    if(!icon){
+        SDL_RWops* rw=SDL_RWFromConstMem(HEART_PNG,(int)HEART_PNG_SIZE);
+        SDL_Surface* surface=rw?IMG_Load_RW(rw,1):nullptr;
+        if(surface){icon=SDL_CreateTextureFromSurface(r,surface);SDL_FreeSurface(surface);}
+        if(icon)SDL_SetTextureBlendMode(icon,SDL_BLENDMODE_BLEND);
+    }
+    return icon;
+}
 static void drawDonationButton(SDL_Renderer* r,int x,int y){
     roundedFill(r,x,y,62,54,12,127,28,57);
     roundedFill(r,x+2,y+2,58,50,10,153,31,67);
-    // Coracao preenchido desenhado com duas curvas e ponta inferior.
-    SDL_SetRenderDrawColor(r,255,241,245,255);
-    for(int py=0;py<30;py++)for(int px=0;px<38;px++){
-        float xx=(px-18.5f)/18.5f,yy=(py-11.f)/18.5f;
-        float a=xx*xx+yy*yy-1.f;
-        if(a*a*a-xx*xx*yy*yy*yy<=0.f)SDL_RenderDrawPoint(r,x+12+px,y+11+py);
+    if(SDL_Texture* icon=heartIconTexture(r)){
+        const SDL_Rect dst{x+12,y+8,38,38};
+        SDL_RenderCopy(r,icon,nullptr,&dst);
     }
+}
+static void drawLibraryTopButton(SDL_Renderer* r,int x,int y){
+    drawTopButton(r,x,y,62,54);
 }
 static void drawDonationDialog(SDL_Renderer* r,bool portrait){
     const int W=portrait?720:1280,H=portrait?1280:720;
@@ -899,7 +911,7 @@ static void drawDonationDialog(SDL_Renderer* r,bool portrait){
     }
     label(r,x+28,y+qrSize+151,"ALEX BEU SANTOS",1,245,245,248);
     label(r,x+28,y+qrSize+182,"ESCANEIE COM O APP DO BANCO",1,193,197,208);
-    label(r,x+28,y+panelH-43,"TOQUE AQUI OU APERTE B PARA FECHAR",1,211,178,191);
+    label(r,x+28,y+panelH-43,"TOQUE FORA OU APERTE B PARA FECHAR",1,211,178,191);
     SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
 }
 
@@ -1111,17 +1123,35 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             const float portraitX=ev.tfinger.y*720.f;
             const float portraitY=(1.f-ev.tfinger.x)*1280.f;
             if(donationOpen){
-                if(ev.type==SDL_FINGERUP)donationOpen=false;
+                // Janela modal: so fecha com toque FORA do painel ou botao B.
+                // Ignorar FINGERUP evita fechar no mesmo toque que abriu.
+                if(ev.type==SDL_FINGERDOWN){
+                    const float dx=portraitMode?portraitX:ev.tfinger.x*1280.f;
+                    const float dy=portraitMode?portraitY:ev.tfinger.y*720.f;
+                    const int pw=portraitMode?620:570,ph=portraitMode?710:625;
+                    const int sx=((portraitMode?720:1280)-pw)/2;
+                    const int sy=((portraitMode?1280:720)-ph)/2;
+                    if(dx<sx || dx>=sx+pw || dy<sy || dy>=sy+ph)donationOpen=false;
+                }
                 continue;
             }
             if(ev.type==SDL_FINGERDOWN && !(z||textReading) && !securityScreen && libraryScreen==0){
-                if((portraitMode && portraitX>=405.f && portraitX<495.f && portraitY>=40.f && portraitY<104.f) ||
-                   (!portraitMode && ev.tfinger.x*1280.f>=968.f && ev.tfinger.x*1280.f<1042.f &&
-                    ev.tfinger.y*720.f>=112.f && ev.tfinger.y*720.f<174.f)){
+                if((portraitMode && portraitX>=390.f && portraitX<452.f && portraitY>=40.f && portraitY<104.f) ||
+                   (!portraitMode && ev.tfinger.x*1280.f>=900.f && ev.tfinger.x*1280.f<962.f &&
+                    ev.tfinger.y*720.f>=112.f && ev.tfinger.y*720.f<170.f)){
                     donationOpen=true;libraryTouchDragging=false;continue;
                 }
             }
 
+            if(ev.type==SDL_FINGERDOWN && portraitMode && !(z||textReading) && !securityScreen &&
+               portraitX>=477.f && portraitX<539.f && portraitY>=40.f && portraitY<104.f){
+                libraryPortraitScroll=0;libraryTouchDragging=false;continue;
+            }
+            if(ev.type==SDL_FINGERDOWN && !portraitMode && !(z||textReading) && !securityScreen &&
+               ev.tfinger.x*1280.f>=984.f && ev.tfinger.x*1280.f<1046.f &&
+               ev.tfinger.y*720.f>=112.f && ev.tfinger.y*720.f<170.f){
+                libraryHorizontalScroll=0;libraryTouchDragging=false;continue;
+            }
             if(ev.type==SDL_FINGERDOWN && portraitMode && !(z||textReading) &&
                portraitX>=500.f && portraitX<700.f &&
                portraitY>=40.f && portraitY<100.f){
@@ -1323,8 +1353,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         }
         if(ev.type!=SDL_CONTROLLERBUTTONDOWN&&ev.type!=SDL_KEYDOWN)continue;
         int b=ev.type==SDL_CONTROLLERBUTTONDOWN?ev.cbutton.button:-1;SDL_Keycode k=ev.type==SDL_KEYDOWN?ev.key.keysym.sym:0;
-        if(b==SDL_CONTROLLER_BUTTON_START||k==SDLK_ESCAPE){running=false;break;}
-        if(donationOpen){if(b==SDL_CONTROLLER_BUTTON_A||b==SDL_CONTROLLER_BUTTON_B||k==SDLK_BACKSPACE||k==SDLK_RETURN)donationOpen=false;continue;}
+        if(!donationOpen && (b==SDL_CONTROLLER_BUTTON_START||k==SDLK_ESCAPE)){running=false;break;}
+        if(donationOpen){if(b==SDL_CONTROLLER_BUTTON_A||k==SDLK_BACKSPACE||k==SDLK_ESCAPE)donationOpen=false;continue;}
         if(!z&&!textReading&&!securityScreen&&libraryScreen==0&&(b==SDL_CONTROLLER_BUTTON_LEFTSHOULDER||k==SDLK_F4)){donationOpen=true;continue;}
         if(securityScreen){
             if(securityScreen==4){
@@ -1551,7 +1581,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         label(r,36,20,"MangaCAP",3,245,245,248);
         label(r,36,75,libraryScreen==0?(privateMode?"BIBLIOTECA PRIVADA":"MINHA BIBLIOTECA"):"VOLUMES DA OBRA",1,196,196,208);
         label(r,1060,36,"V1.0.0",2,211,72,88);
-        if(libraryScreen==0)drawDonationButton(r,974,116);
+        if(libraryScreen==0)drawDonationButton(r,900,116);
+        drawLibraryTopButton(r,984,116);
         if(libraryScreen==0)
             label(r,36,130,std::to_string(works.size())+" OBRAS  /  "+std::to_string(books.size())+" VOLUMES",1,175,178,188);
         else
@@ -1695,7 +1726,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             fill(r,0,0,720,145,16,17,23);
             fill(r,0,141,720,3,192,43,61);
             label(r,24,20,"MangaCAP",3,245,245,248);
-            if(libraryScreen==0)drawDonationButton(r,419,43);
+            if(libraryScreen==0)drawDonationButton(r,390,43);
+            drawLibraryTopButton(r,477,43);
             label(r,24,83,libraryScreen==0?(privateMode?"BIBLIOTECA PRIVADA":"MINHA BIBLIOTECA"):"< VOLUMES",1,196,196,208);
             int count=portraitLibraryCount();
             label(r,24,156,std::to_string(count)+(libraryScreen==0?" OBRAS":" VOLUMES"),1,175,178,188);
