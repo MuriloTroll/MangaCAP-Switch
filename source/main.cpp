@@ -1084,6 +1084,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                     }
                     if(ev.type==SDL_FINGERUP){
                         libraryTouchDragging=false;
+                        if(std::abs(portraitY-touchStartY)>14.f || std::abs(portraitX-touchStartX)>14.f)touchMoved=true;
                         if(touchMoved)continue;
                         if(portraitY<145.f && libraryScreen==1){libraryScreen=0;libraryPortraitScroll=0;continue;}
                         const int col=((int)portraitX-20)/230;
@@ -1114,13 +1115,16 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                     continue;
                 }
                 if(libraryTouchDragging && ev.tfinger.fingerId==activeFinger){
-                    if(std::abs(hy-touchStartY)>14.f)touchMoved=true;
+                    if(std::abs(hy-touchStartY)>10.f || std::abs(hx-touchStartX)>10.f)touchMoved=true;
                     if(ev.type==SDL_FINGERMOTION){
                         if(touchMoved)libraryHorizontalScroll=std::max(0,std::min(horizontalLibraryMaxScroll(),libraryHorizontalScroll+(int)(touchLastY-hy)));
                         touchLastY=hy;continue;
                     }
                     if(ev.type==SDL_FINGERUP){
                         libraryTouchDragging=false;
+                        // Conferir tambem o deslocamento final: alguns drivers enviam
+                        // poucos eventos FINGERMOTION durante gestos rapidos.
+                        if(std::abs(hy-touchStartY)>10.f || std::abs(hx-touchStartX)>10.f)touchMoved=true;
                         if(touchMoved)continue;
                         if(hy>=112.f && hy<165.f && libraryScreen==1){libraryScreen=0;libraryHorizontalScroll=0;continue;}
                         if(hy>=165.f && hy<655.f && hx>=36.f && hx<1260.f){
@@ -1541,6 +1545,17 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             }
         }
         SDL_RenderSetClipRect(r,nullptr);
+        // Indicador de rolagem proporcional ao conteudo visivel.
+        {
+            const int maxScroll=horizontalLibraryMaxScroll();
+            if(maxScroll>0){
+                const int trackY=174,trackH=478,trackX=1268;
+                const int thumbH=std::max(32,(int)((long long)trackH*trackH/(trackH+maxScroll)));
+                const int thumbY=trackY+(int)((long long)libraryHorizontalScroll*(trackH-thumbH)/maxScroll);
+                fill(r,trackX,trackY,5,trackH,55,58,67);
+                fill(r,trackX,thumbY,5,thumbH,192,43,74);
+            }
+        }
         fill(r,0,665,1280,55,22,23,30);
         label(r,28,680,libraryScreen==0?"ARRASTE PARA NAVEGAR   A: VOLUMES   X: CAPA   Y: ATUALIZAR":
               "ARRASTE PARA NAVEGAR   A: LER   B: VOLTAR   D-PAD: NAVEGAR",1);
@@ -1652,6 +1667,16 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 labelMedium(r,x,y+290,compactTitle(title,17));
             }
             SDL_RenderSetClipRect(r,nullptr);
+            {
+                const int maxScroll=portraitLibraryMaxScroll();
+                if(maxScroll>0){
+                    const int trackY=190,trackH=1030,trackX=711;
+                    const int thumbH=std::max(36,(int)((long long)trackH*trackH/(trackH+maxScroll)));
+                    const int thumbY=trackY+(int)((long long)libraryPortraitScroll*(trackH-thumbH)/maxScroll);
+                    fill(r,trackX,trackY,5,trackH,55,58,67);
+                    fill(r,trackX,thumbY,5,thumbH,192,43,74);
+                }
+            }
             fill(r,0,1230,720,50,22,23,30);
             label(r,18,1246,"ARRASTE PARA NAVEGAR",1,190,190,205);
         }else{
