@@ -887,6 +887,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     mkdir("sdmc:/switch/MangaCAP/covers",0777);
     auto books=scan();auto works=groupBooks(books);mark("biblioteca OK");
     int selected=0,selectedVolume=0,activeBook=-1,libraryScreen=0,page=0,iw=1,ih=1;
+    int libraryPortraitScroll=0;
     bool privateMode=false;
     SecurityData security=readSecurity();
     // 0=normal, 1=criar, 2=confirmar, 3=desbloquear, 4=mostrar recuperacao,
@@ -1022,7 +1023,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         release();
         clearCovers(covers);
         books=scan(privateMode);works=groupBooks(books);
-        selected=0;selectedVolume=0;libraryScreen=0;activeBook=-1;
+        selected=0;selectedVolume=0;libraryScreen=0;libraryPortraitScroll=0;activeBook=-1;
         refreshCovers();coverTried.clear();pageCountCache.clear();
     };
     auto goTop=[&](){
@@ -1040,9 +1041,11 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         }
         showReaderHud=false;
     };
-    bool touchDragging=false, touchMoved=false;
+    bool touchDragging=false, touchMoved=false,libraryTouchDragging=false;
     SDL_FingerID activeFinger=0;
     float touchStartX=0, touchStartY=0, touchLastX=0, touchLastY=0;
+    auto portraitLibraryCount=[&]()->int{return libraryScreen==0?(int)works.size():(works.empty()?0:(int)works[selected].volumes.size());};
+    auto portraitLibraryMaxScroll=[&]()->int{int rows=(portraitLibraryCount()+2)/3;return std::max(0,rows*340-1000);};
     auto logicalTouch=[&](float px,float py)->SDL_FPoint{
         if(!portraitMode)return SDL_FPoint{px*1280.f,py*720.f};
         float x=py*720.f,y=(1.f-px)*1280.f;
@@ -1063,6 +1066,37 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                portraitX>=500.f && portraitX<700.f &&
                portraitY>=40.f && portraitY<100.f){
                 togglePortrait();continue;
+            }
+            // Grade vertical: arrasto rola a biblioteca; toque curto seleciona uma capa.
+            if(portraitMode && !(z||textReading) && !securityScreen){
+                if(ev.type==SDL_FINGERDOWN){
+                    libraryTouchDragging=true;touchMoved=false;activeFinger=ev.tfinger.fingerId;
+                    touchStartX=touchLastX=portraitX;touchStartY=touchLastY=portraitY;
+                    continue;
+                }
+                if(libraryTouchDragging && ev.tfinger.fingerId==activeFinger){
+                    if(std::abs(portraitY-touchStartY)>14.f)touchMoved=true;
+                    if(ev.type==SDL_FINGERMOTION){
+                        if(touchMoved){libraryPortraitScroll=std::max(0,std::min(portraitLibraryMaxScroll(),libraryPortraitScroll+(int)(touchLastY-portraitY)));}
+                        touchLastY=portraitY;continue;
+                    }
+                    if(ev.type==SDL_FINGERUP){
+                        libraryTouchDragging=false;
+                        if(touchMoved)continue;
+                        if(portraitY<145.f && libraryScreen==1){libraryScreen=0;libraryPortraitScroll=0;continue;}
+                        const int col=((int)portraitX-20)/230;
+                        const int row=((int)portraitY-190+libraryPortraitScroll)/340;
+                        if(portraitX>=20 && portraitX<710 && portraitY>=190 && portraitY<1220 && col>=0 && col<3 && row>=0){
+                            int idx=row*3+col;
+                            if(idx<portraitLibraryCount()){
+                                if(libraryScreen==0){selected=idx;selectedVolume=resumeVolume(selected);libraryScreen=1;libraryPortraitScroll=0;}
+                                else{selectedVolume=idx;openBook(works[selected].volumes[idx]);}
+                            }
+                        }
+                        continue;
+                    }
+                }
+                continue;
             }
             SDL_FPoint pt=logicalTouch(ev.tfinger.x,ev.tfinger.y);
             if(ev.type==SDL_FINGERDOWN){
@@ -1282,16 +1316,23 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 refreshCovers();
                 continue;
             }
-            if(back && libraryScreen==1){libraryScreen=0;continue;}
+            if(back && libraryScreen==1){libraryScreen=0;libraryPortraitScroll=0;continue;}
             int count=libraryScreen==0?(int)works.size():(works.empty()?0:(int)works[selected].volumes.size());
             int& pos=libraryScreen==0?selected:selectedVolume;
             if(count>0){
+                int navCols=portraitMode?3:5;
                 if(b==SDL_CONTROLLER_BUTTON_DPAD_RIGHT||k==SDLK_RIGHT)pos=std::min(count-1,pos+1);
                 if(b==SDL_CONTROLLER_BUTTON_DPAD_LEFT||k==SDLK_LEFT)pos=std::max(0,pos-1);
-                if(b==SDL_CONTROLLER_BUTTON_DPAD_DOWN||k==SDLK_DOWN)pos=std::min(count-1,pos+5);
-                if(b==SDL_CONTROLLER_BUTTON_DPAD_UP||k==SDLK_UP)pos=std::max(0,pos-5);
+                if(b==SDL_CONTROLLER_BUTTON_DPAD_DOWN||k==SDLK_DOWN)pos=std::min(count-1,pos+navCols);
+                if(b==SDL_CONTROLLER_BUTTON_DPAD_UP||k==SDLK_UP)pos=std::max(0,pos-navCols);
+                if(portraitMode){
+                    int y=(pos/3)*340;
+                    if(y<libraryPortraitScroll)libraryPortraitScroll=y;
+                    if(y+320>libraryPortraitScroll+1000)libraryPortraitScroll=y+320-1000;
+                    libraryPortraitScroll=std::max(0,std::min(portraitLibraryMaxScroll(),libraryPortraitScroll));
+                }
                 if(accept){
-                    if(libraryScreen==0){libraryScreen=1;selectedVolume=resumeVolume(selected);}
+                    if(libraryScreen==0){libraryScreen=1;selectedVolume=resumeVolume(selected);libraryPortraitScroll=0;}
                     else openBook(works[selected].volumes[selectedVolume]);
                 }
             }
@@ -1556,8 +1597,35 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 label(r,390,1161,adjacentBook(1)>=0?"PROXIMO >":"ULTIMO",2);
                 label(r,24,1240,std::to_string(page+1)+" / "+std::to_string(pages.size()),1);
             }
+        }else if(!securityScreen){
+            // Biblioteca nativa 720x1280: 3 colunas, linhas ilimitadas, rolagem vertical.
+            fill(r,0,0,720,145,16,17,23);
+            fill(r,0,141,720,3,192,43,61);
+            label(r,24,20,"MangaCAP",3,245,245,248);
+            label(r,24,83,libraryScreen==0?(privateMode?"BIBLIOTECA PRIVADA":"MINHA BIBLIOTECA"):"< VOLUMES",1,196,196,208);
+            int count=portraitLibraryCount();
+            label(r,24,156,std::to_string(count)+(libraryScreen==0?" OBRAS":" VOLUMES"),1,175,178,188);
+            SDL_Rect clip{0,188,720,1035};SDL_RenderSetClipRect(r,&clip);
+            int start=std::max(0,libraryPortraitScroll/340*3);
+            int end=std::min(count,start+15);
+            for(int idx=start;idx<end;++idx){
+                int col=idx%3,row=idx/3;
+                int x=20+col*230,y=195+row*340-libraryPortraitScroll;
+                int bookIndex=libraryScreen==0?works[idx].volumes.front():works[selected].volumes[idx];
+                bool active=idx==(libraryScreen==0?selected:selectedVolume);
+                fill(r,x-3,y-3,216,287,active?213:30,active?60:31,active?77:39);
+                fill(r,x,y,210,280,7,8,12);
+                Cover*c=coverAt(bookIndex,libraryScreen==0?works[idx].title:books[bookIndex].name,libraryScreen==0,libraryScreen==0?idx:selected);
+                if(c&&c->tex)drawCover(r,c->tex,c->w,c->h,x,y,210,280);
+                else label(r,x+45,y+120,"SEM CAPA",1,170,170,182);
+                std::string title=libraryScreen==0?cleanLibraryWorkTitle(works[idx].title):stripExtension(books[bookIndex].name);
+                labelMedium(r,x,y+290,compactTitle(title,17));
+            }
+            SDL_RenderSetClipRect(r,nullptr);
+            fill(r,0,1230,720,50,22,23,30);
+            label(r,18,1246,"ARRASTE PARA NAVEGAR",1,190,190,205);
         }else{
-            // Biblioteca e PIN preservados sem distorcao; layout horizontal centralizado.
+            // PIN permanece no layout original, sem alterar o fluxo de seguranca.
             SDL_Rect scaled{0,437,720,405};
             SDL_RenderCopy(r,landscapeFrame,nullptr,&scaled);
         }
