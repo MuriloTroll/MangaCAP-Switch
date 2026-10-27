@@ -6,6 +6,7 @@
 #include "font.h"
 #include "rotate_cw_png.h"
 #include "arrow_up_png.h"
+#include "pix_qr_png.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -858,6 +859,50 @@ static void drawRotateButton(SDL_Renderer* r,int x,int y,int w,int h){
     }
 }
 
+static SDL_Texture* pixQrTexture(SDL_Renderer* r){
+    static SDL_Texture* icon=nullptr;static SDL_Renderer* owner=nullptr;
+    if(owner!=r){icon=nullptr;owner=r;}
+    if(!icon){
+        SDL_RWops* rw=SDL_RWFromConstMem(PIX_QR_PNG,(int)PIX_QR_PNG_SIZE);
+        SDL_Surface* surface=rw?IMG_Load_RW(rw,1):nullptr;
+        if(surface){icon=SDL_CreateTextureFromSurface(r,surface);SDL_FreeSurface(surface);}
+    }
+    return icon;
+}
+static void drawDonationButton(SDL_Renderer* r,int x,int y){
+    roundedFill(r,x,y,62,54,12,127,28,57);
+    roundedFill(r,x+2,y+2,58,50,10,153,31,67);
+    // Coracao preenchido desenhado com duas curvas e ponta inferior.
+    SDL_SetRenderDrawColor(r,255,241,245,255);
+    for(int py=0;py<30;py++)for(int px=0;px<38;px++){
+        float xx=(px-18.5f)/18.5f,yy=(py-11.f)/18.5f;
+        float a=xx*xx+yy*yy-1.f;
+        if(a*a*a-xx*xx*yy*yy*yy<=0.f)SDL_RenderDrawPoint(r,x+12+px,y+11+py);
+    }
+}
+static void drawDonationDialog(SDL_Renderer* r,bool portrait){
+    const int W=portrait?720:1280,H=portrait?1280:720;
+    SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(r,0,0,0,220);SDL_Rect shade{0,0,W,H};SDL_RenderFillRect(r,&shade);
+    const int panelW=portrait?620:570,panelH=portrait?710:625;
+    const int x=(W-panelW)/2,y=(H-panelH)/2;
+    roundedFill(r,x,y,panelW,panelH,20,32,35,46);
+    roundedFill(r,x+3,y+3,panelW-6,panelH-6,18,24,27,37);
+    label(r,x+28,y+22,"APOIE O MANGACAP",2,245,245,248);
+    label(r,x+28,y+66,"DOACAO OPCIONAL VIA PIX",1,211,178,191);
+    const int qrSize=portrait?410:390;
+    const SDL_Rect white{x+(panelW-qrSize-16)/2,y+112,qrSize+16,qrSize+16};
+    fill(r,white.x,white.y,white.w,white.h,255,255,255);
+    if(SDL_Texture* qr=pixQrTexture(r)){
+        SDL_Rect target{white.x+8,white.y+8,qrSize,qrSize};
+        SDL_RenderCopy(r,qr,nullptr,&target);
+    }
+    label(r,x+28,y+qrSize+151,"ALEX BEU SANTOS",1,245,245,248);
+    label(r,x+28,y+qrSize+182,"ESCANEIE COM O APP DO BANCO",1,193,197,208);
+    label(r,x+28,y+panelH-43,"TOQUE AQUI OU APERTE B PARA FECHAR",1,211,178,191);
+    SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
+}
+
 int main(int argc,char**argv){(void)argc;(void)argv;
     // Log de diagnóstico antes de inicializar os componentes gráficos.
     mkdir(ROOT,0777);FILE* log=fopen("sdmc:/switch/MangaCAP/startup.log","w");
@@ -1054,6 +1099,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         if(z||textReading)return SDL_FPoint{x,y};
         return SDL_FPoint{x*1280.f/720.f,(y-437.5f)*720.f/405.f};
     };
+    bool donationOpen=false;
     bool running=true;while(running){SDL_Event ev;while(SDL_PollEvent(&ev)){
         if(ev.type==SDL_QUIT){running=false;break;}
         if(ev.type==SDL_KEYDOWN && ev.key.keysym.sym==SDLK_F9){togglePortrait();continue;}
@@ -1064,6 +1110,18 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             // os demais toques para a biblioteca evita perder a area clicavel.
             const float portraitX=ev.tfinger.y*720.f;
             const float portraitY=(1.f-ev.tfinger.x)*1280.f;
+            if(donationOpen){
+                if(ev.type==SDL_FINGERUP)donationOpen=false;
+                continue;
+            }
+            if(ev.type==SDL_FINGERDOWN && !(z||textReading) && !securityScreen && libraryScreen==0){
+                if((portraitMode && portraitX>=405.f && portraitX<495.f && portraitY>=40.f && portraitY<104.f) ||
+                   (!portraitMode && ev.tfinger.x*1280.f>=968.f && ev.tfinger.x*1280.f<1042.f &&
+                    ev.tfinger.y*720.f>=112.f && ev.tfinger.y*720.f<174.f)){
+                    donationOpen=true;libraryTouchDragging=false;continue;
+                }
+            }
+
             if(ev.type==SDL_FINGERDOWN && portraitMode && !(z||textReading) &&
                portraitX>=500.f && portraitX<700.f &&
                portraitY>=40.f && portraitY<100.f){
@@ -1266,6 +1324,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         if(ev.type!=SDL_CONTROLLERBUTTONDOWN&&ev.type!=SDL_KEYDOWN)continue;
         int b=ev.type==SDL_CONTROLLERBUTTONDOWN?ev.cbutton.button:-1;SDL_Keycode k=ev.type==SDL_KEYDOWN?ev.key.keysym.sym:0;
         if(b==SDL_CONTROLLER_BUTTON_START||k==SDLK_ESCAPE){running=false;break;}
+        if(donationOpen){if(b==SDL_CONTROLLER_BUTTON_A||b==SDL_CONTROLLER_BUTTON_B||k==SDLK_BACKSPACE||k==SDLK_RETURN)donationOpen=false;continue;}
+        if(!z&&!textReading&&!securityScreen&&libraryScreen==0&&(b==SDL_CONTROLLER_BUTTON_LEFTSHOULDER||k==SDLK_F4)){donationOpen=true;continue;}
         if(securityScreen){
             if(securityScreen==4){
                 if(b==SDL_CONTROLLER_BUTTON_B||k==SDLK_RETURN){securityScreen=0;securityRecovery.clear();privateUnlocked=true;privateMode=true;refreshLibrary();}
@@ -1490,7 +1550,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         fill(r,0,108,1280,3,192,43,61);
         label(r,36,20,"MangaCAP",3,245,245,248);
         label(r,36,75,libraryScreen==0?(privateMode?"BIBLIOTECA PRIVADA":"MINHA BIBLIOTECA"):"VOLUMES DA OBRA",1,196,196,208);
-        label(r,1060,36,"V0.7.8.2",2,211,72,88);
+        label(r,1060,36,"V1.0.0",2,211,72,88);
+        if(libraryScreen==0)drawDonationButton(r,974,116);
         if(libraryScreen==0)
             label(r,36,130,std::to_string(works.size())+" OBRAS  /  "+std::to_string(books.size())+" VOLUMES",1,175,178,188);
         else
@@ -1589,6 +1650,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     if(!portraitMode && (!(z||textReading)||showReaderHud)){
         drawRotateButton(r,portraitButton.x,portraitButton.y,portraitButton.w,portraitButton.h);
     }
+    if(!portraitMode && donationOpen)drawDonationDialog(r,false);
     if(portraitMode && portraitFrame){
         SDL_SetRenderTarget(r,portraitFrame);
         SDL_SetRenderDrawColor(r,12,14,20,255);SDL_RenderClear(r);
@@ -1633,6 +1695,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             fill(r,0,0,720,145,16,17,23);
             fill(r,0,141,720,3,192,43,61);
             label(r,24,20,"MangaCAP",3,245,245,248);
+            if(libraryScreen==0)drawDonationButton(r,419,43);
             label(r,24,83,libraryScreen==0?(privateMode?"BIBLIOTECA PRIVADA":"MINHA BIBLIOTECA"):"< VOLUMES",1,196,196,208);
             int count=portraitLibraryCount();
             label(r,24,156,std::to_string(count)+(libraryScreen==0?" OBRAS":" VOLUMES"),1,175,178,188);
@@ -1675,6 +1738,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 drawTopButton(r,portraitTopButton.x,portraitTopButton.y,portraitTopButton.w,portraitTopButton.h);
             drawRotateButton(r,500,40,200,60);
         }
+        if(donationOpen)drawDonationDialog(r,true);
         SDL_SetRenderTarget(r,nullptr);
         SDL_SetRenderDrawColor(r,0,0,0,255);SDL_RenderClear(r);
         const SDL_Rect dest{280,-280,720,1280};

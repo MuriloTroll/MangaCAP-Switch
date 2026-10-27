@@ -6,7 +6,7 @@ TOPDIR ?= $(CURDIR)
 include $(DEVKITPRO)/libnx/switch_rules
 APP_TITLE := MangaCAP
 APP_AUTHOR := MangaCAP
-APP_VERSION := 0.7.9-test1
+APP_VERSION := 1.0.0
 ICON := $(TOPDIR)/icon.jpg
 TARGET := MangaCAP
 BUILD := build
