@@ -929,6 +929,26 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     SDL_Texture*landscapeFrame=SDL_CreateTexture(r,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,1280,720);
     if(portraitFrame)SDL_SetTextureBlendMode(portraitFrame,SDL_BLENDMODE_NONE);
     bool portraitMode=false;
+    // Filtro quente exclusivo do leitor: 0=desligado, 1=suave, 2=medio, 3=forte.
+    const char* nightConfig="sdmc:/switch/MangaCAP/night_mode.cfg";
+    int nightLevel=0;
+    { FILE* f=fopen(nightConfig,"r"); if(f){int value=0;if(fscanf(f,"%d",&value)==1 && value>=0 && value<=3)nightLevel=value;fclose(f);} }
+    auto cycleNight=[&](){nightLevel=(nightLevel+1)%4;FILE* f=fopen(nightConfig,"w");if(f){fprintf(f,"%d\n",nightLevel);fclose(f);} };
+    auto drawNightFilter=[&](int width,int height){
+        if(nightLevel==0)return;
+        const Uint8 alpha=(Uint8)(nightLevel==1?38:nightLevel==2?75:112);
+        SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(r,255,178,73,alpha);
+        SDL_Rect rect{0,0,width,height};SDL_RenderFillRect(r,&rect);
+        SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
+    };
+    auto drawNightButton=[&](int x,int y){
+        roundedFill(r,x,y,76,54,12,151,29,72);
+        label(r,x+12,y+17,"LUA",1,255,255,255);
+        if(nightLevel)label(r,x+57,y+17,std::to_string(nightLevel),1,255,242,194);
+    };
+    const SDL_Rect nightLandscape{750,116,76,54};
+    const SDL_Rect nightPortrait{204,44,76,54};
     const SDL_Rect portraitButton{1050,112,210,62};
     const SDL_Rect topButton{850,112,200,62};
     const SDL_Rect portraitTopButton{300,40,200,60};
@@ -1262,6 +1282,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 }
                 // As demais areas de toque continuam usando as coordenadas originais.
                 if(portraitMode && (z||textReading)){
+                    if(showReaderHud && pt.x>=nightPortrait.x && pt.x<nightPortrait.x+nightPortrait.w &&
+                       pt.y>=nightPortrait.y && pt.y<nightPortrait.y+nightPortrait.h){cycleNight();continue;}
                     if(showReaderHud && pt.x>=portraitTopButton.x && pt.x<portraitTopButton.x+portraitTopButton.w &&
                        pt.y>=portraitTopButton.y && pt.y<portraitTopButton.y+portraitTopButton.h){
                         goTop();continue;
@@ -1342,6 +1364,8 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                     }
                     continue;
                 }
+                if(showReaderHud && touchX>=nightLandscape.x && touchX<nightLandscape.x+nightLandscape.w &&
+                   touchY>=nightLandscape.y && touchY<nightLandscape.y+nightLandscape.h){cycleNight();continue;}
                 if(showReaderHud && touchX>=topButton.x && touchY>=topButton.y &&
                    touchX<topButton.x+topButton.w && touchY<topButton.y+topButton.h){
                     goTop();
@@ -1458,6 +1482,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 release();
                 continue;
             }
+            if(b==SDL_CONTROLLER_BUTTON_RIGHTSTICK||k==SDLK_F9){cycleNight();continue;}
             if(b==SDL_CONTROLLER_BUTTON_X||k==SDLK_TAB){
                 continuous=!continuous;panX=panY=0;load();continue;
             }
@@ -1648,7 +1673,9 @@ int main(int argc,char**argv){(void)argc;(void)argv;
             }
         }
         SDL_RenderSetClipRect(r,nullptr);
+        drawNightFilter(1280,showReaderHud?697:720);
         if(showReaderHud){
+            drawNightButton(nightLandscape.x,nightLandscape.y);
             if(activeBook>=0 && activeBook<(int)books.size()){
                 fill(r,0,0,1280,42,20,23,32);
                 label(r,20,10,"LENDO: "+compactTitle(books[activeBook].name,75),1,245,245,248);
@@ -1702,7 +1729,9 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 }
             }
             SDL_RenderSetClipRect(r,nullptr);
+            drawNightFilter(720,viewH);
             if(showReaderHud){
+                drawNightButton(nightPortrait.x,nightPortrait.y);
                 if(activeBook>=0 && activeBook<(int)books.size()){
                     fill(r,0,0,720,36,20,23,32);
                     label(r,12,9,"LENDO: "+compactTitle(books[activeBook].name,43),1,245,245,248);
