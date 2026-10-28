@@ -8,6 +8,7 @@
 #include "arrow_up_png.h"
 #include "pix_qr_png.h"
 #include "heart_png.h"
+#include "moon_png.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -943,15 +944,25 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
     };
     auto drawNightButton=[&](int x,int y){
-        roundedFill(r,x,y,76,54,12,151,29,72);
-        label(r,x+12,y+17,"LUA",1,255,255,255);
-        if(nightLevel)label(r,x+57,y+17,std::to_string(nightLevel),1,255,242,194);
+        roundedFill(r,x,y,76,54,12,127,28,57);
+        roundedFill(r,x+2,y+2,72,50,10,153,31,67);
+        static SDL_Texture* moon=nullptr;
+        if(!moon){
+            SDL_RWops* rw=SDL_RWFromConstMem(MOON_PNG,(int)MOON_PNG_SIZE);
+            SDL_Surface* surface=rw?IMG_Load_RW(rw,1):nullptr;
+            if(surface){moon=SDL_CreateTextureFromSurface(r,surface);SDL_FreeSurface(surface);}
+        }
+        if(moon){const SDL_Rect dst{x+18,y+7,40,40};SDL_RenderCopy(r,moon,nullptr,&dst);}
+        if(nightLevel)label(r,x+58,y+36,std::to_string(nightLevel),1,255,242,194);
     };
-    const SDL_Rect nightLandscape{750,116,76,54};
-    const SDL_Rect nightPortrait{204,44,76,54};
+    // Botoes do leitor alinhados em uma fileira compacta, sem mudar a biblioteca.
+    const SDL_Rect nightLandscape{914,116,76,54};
+    const SDL_Rect topButton{1002,116,76,54};
+    const SDL_Rect readerRotateLandscape{1090,116,76,54};
+    const SDL_Rect nightPortrait{310,44,76,54};
+    const SDL_Rect portraitTopButton{398,44,76,54};
+    const SDL_Rect readerRotatePortrait{486,44,76,54};
     const SDL_Rect portraitButton{1050,112,210,62};
-    const SDL_Rect topButton{850,112,200,62};
-    const SDL_Rect portraitTopButton{300,40,200,60};
     auto togglePortrait=[&](){
         if(!portraitFrame || !landscapeFrame){mark("Rotacao indisponivel: sem textura de destino");return;}
         portraitMode=!portraitMode;
@@ -1274,7 +1285,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
                 }else continue;
             }
             if(ev.type==SDL_FINGERDOWN){
-                const SDL_Rect button=portraitMode?SDL_Rect{500,40,200,60}:portraitButton;
+                const SDL_Rect button=portraitMode?((z||textReading)?readerRotatePortrait:SDL_Rect{500,40,200,60}):((z||textReading)?readerRotateLandscape:portraitButton);
                 bool visible=!(z||textReading)||showReaderHud;
                 if(visible && pt.x>=button.x && pt.x<button.x+button.w &&
                    pt.y>=button.y && pt.y<button.y+button.h){
@@ -1699,7 +1710,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
     if(!message.empty()){fill(r,0,626,1280,42,128,24,40);label(r,30,634,message,2);}
     // Botao da orientacao segue a visibilidade do HUD durante a leitura.
     if(!portraitMode && (!(z||textReading)||showReaderHud)){
-        drawRotateButton(r,portraitButton.x,portraitButton.y,portraitButton.w,portraitButton.h);
+        drawRotateButton(r,(z||textReading)?readerRotateLandscape.x:portraitButton.x,(z||textReading)?readerRotateLandscape.y:portraitButton.y,(z||textReading)?readerRotateLandscape.w:portraitButton.w,(z||textReading)?readerRotateLandscape.h:portraitButton.h);
     }
     if(!portraitMode && donationOpen)drawDonationDialog(r,false);
     if(portraitMode && portraitFrame){
@@ -1790,7 +1801,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         if(!(z||textReading)||showReaderHud){
             if((z||textReading) && showReaderHud)
                 drawTopButton(r,portraitTopButton.x,portraitTopButton.y,portraitTopButton.w,portraitTopButton.h);
-            drawRotateButton(r,500,40,200,60);
+            drawRotateButton(r,(z||textReading)?readerRotatePortrait.x:500,(z||textReading)?readerRotatePortrait.y:40,(z||textReading)?readerRotatePortrait.w:200,(z||textReading)?readerRotatePortrait.h:60);
         }
         if(donationOpen)drawDonationDialog(r,true);
         SDL_SetRenderTarget(r,nullptr);
