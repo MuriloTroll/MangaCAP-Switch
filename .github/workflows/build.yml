@@ -47,12 +47,12 @@ jobs:
       - name: Publicar build de validacao da v1.0.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-rc2-${{ github.run_number }}
-          name: MangaCAP Switch v1.0.0 - Candidato a lancamento (${{ github.run_number }})
+          tag_name: v1.1.0-night-test-${{ github.run_number }}
+          name: MangaCAP Switch v1.1.0 - Teste filtro noturno (${{ github.run_number }})
           prerelease: true
           generate_release_notes: false
           body: |
-            Candidato a lancamento da v1.0.0. Teste no Switch antes da release publica.
+            Teste do filtro de leitura quente. Nao substitui a v1.0.0 estavel.
             Biblioteca responsiva, leitor com rotacao e botao opcional de apoio Pix.
             O QR Pix e estatico e funciona sem conexao com a internet.
           files: MangaCAP.nro
