@@ -5,3 +5,5 @@ O leitor abre .cbr diretamente usando libarchive, com leitura sob demanda de cad
 A compilacao requer `switch-libarchive` no devkitPro. O workflow tenta instalar esse pacote. Se o pacote nao existir no repositorio utilizado, sera necessario compilar libarchive para Switch antes de executar `make`.
 
 Nao foi possivel compilar ou testar o NRO neste ambiente (devkitPro ausente). O arquivo AKIRA RAR4 ainda precisa ser validado no console.
+
+Correcao de linkagem: libarchive estatico exige -lbz2 -llz4 -llzma -lzstd apos -larchive.

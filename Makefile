@@ -20,7 +20,7 @@ CFLAGS += $(INCLUDE)
 CXXFLAGS := $(CFLAGS) -std=gnu++17 -fno-rtti -fno-exceptions
 ASFLAGS := -g $(ARCH)
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LIBS := -larchive -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lm -lSDL2_image -lSDL2 -lEGL -lglapi -ldrm_nouveau -lpng -ljpeg -lwebp -lz -lnx
+LIBS := -larchive -lbz2 -llz4 -llzma -lzstd -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lm -lSDL2_image -lSDL2 -lEGL -lglapi -ldrm_nouveau -lpng -ljpeg -lwebp -lz -lnx
 LIBDIRS := $(PORTLIBS) $(LIBNX)
 # SDL2 headers live in the SDL2 subdirectory of the Switch portlibs.
 INCLUDES :=
