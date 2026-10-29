@@ -40,6 +40,11 @@ jobs:
           for file in "$CURL_H" "$CURL_LIB" "$MBEDTLS_LIB" "$MBEDX509_LIB" "$MBEDCRYPTO_LIB"; do
             test -f "$file" || { echo "Dependencia HTTPS ausente: $file"; exit 1; }
           done
+      - name: Instalar leitor RAR para CBR
+        run: |
+          dkp-pacman -Sy --noconfirm switch-libarchive
+          test -f /opt/devkitpro/portlibs/switch/include/archive.h
+          test -f /opt/devkitpro/portlibs/switch/lib/libarchive.a
       - name: Compilar MangaCAP
         run: make -j2
       - name: Verificar NRO
