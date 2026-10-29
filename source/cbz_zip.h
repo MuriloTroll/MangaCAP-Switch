@@ -7,6 +7,7 @@ class CbzZip {
     std::string path_;
     std::vector<CbzEntry> entries_;
     bool valid_=false;
+    bool rar_=false;
 public:
     explicit CbzZip(const std::string& path);
     bool valid() const {return valid_;}

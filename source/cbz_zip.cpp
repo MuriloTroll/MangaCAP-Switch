@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <archive.h>
+#include <archive_entry.h>
 static uint16_t u16(const unsigned char*p){return (uint16_t)(p[0]|p[1]<<8);}
 static uint32_t u32(const unsigned char*p){return (uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
 static bool at(FILE*f,uint64_t pos,void*data,size_t n){
@@ -11,6 +13,32 @@ static bool at(FILE*f,uint64_t pos,void*data,size_t n){
     return fread(data,1,n,f)==n;
 }
 CbzZip::CbzZip(const std::string& path):path_(path){
+    // RAR4/RAR5 via libarchive. Somente o indice fica em memoria.
+    FILE*magic=fopen(path.c_str(),"rb");
+    unsigned char signature[8]{};
+    size_t got=magic?fread(signature,1,sizeof(signature),magic):0;
+    if(magic)fclose(magic);
+    if(got>=7 && memcmp(signature,"Rar!\x1a\x07",6)==0 && (signature[6]==0 || signature[6]==1)){
+        rar_=true;
+        struct archive*a=archive_read_new();
+        archive_read_support_filter_all(a);
+        archive_read_support_format_rar(a);
+        archive_read_support_format_rar5(a);
+        if(archive_read_open_filename(a,path.c_str(),65536)==ARCHIVE_OK){
+            struct archive_entry*e=nullptr;
+            while(entries_.size()<5000 && archive_read_next_header(a,&e)==ARCHIVE_OK){
+                const char*name=archive_entry_pathname(e);
+                auto size=archive_entry_size(e);
+                if(name && strlen(name)<4096 && size>0 && size<=24*1024*1024 && archive_entry_filetype(e)==AE_IFREG){
+                    entries_.push_back({name,0,(uint32_t)size,0,0,0,0});
+                }
+                archive_read_data_skip(a);
+            }
+            valid_=!entries_.empty();
+        }
+        archive_read_free(a);
+        return;
+    }
     FILE*f=fopen(path.c_str(),"rb");if(!f)return;
     if(fseek(f,0,SEEK_END)!=0){fclose(f);return;}
     long len=ftell(f);if(len<22){fclose(f);return;}
@@ -44,6 +72,34 @@ CbzZip::CbzZip(const std::string& path):path_(path){
 }
 bool CbzZip::read(const std::string& name,std::vector<unsigned char>&data,size_t limit)const{
     data.clear();if(!valid_)return false;
+    if(rar_){
+        struct archive*a=archive_read_new();
+        archive_read_support_filter_all(a);
+        archive_read_support_format_rar(a);
+        archive_read_support_format_rar5(a);
+        bool ok=false;
+        if(archive_read_open_filename(a,path_.c_str(),65536)==ARCHIVE_OK){
+            struct archive_entry*e=nullptr;
+            while(archive_read_next_header(a,&e)==ARCHIVE_OK){
+                const char*entryName=archive_entry_pathname(e);
+                if(!entryName || name!=entryName){archive_read_data_skip(a);continue;}
+                auto sz=archive_entry_size(e);
+                if(sz<=0 || (uint64_t)sz>limit || archive_entry_filetype(e)!=AE_IFREG)break;
+                data.resize((size_t)sz);
+                size_t offset=0;
+                while(offset<data.size()){
+                    la_ssize_t n=archive_read_data(a,data.data()+offset,data.size()-offset);
+                    if(n<=0)break;
+                    offset+=(size_t)n;
+                }
+                ok=offset==data.size();
+                break;
+            }
+        }
+        archive_read_free(a);
+        if(!ok)data.clear();
+        return ok;
+    }
     auto it=std::find_if(entries_.begin(),entries_.end(),[&](const CbzEntry&e){return e.name==name;});
     if(it==entries_.end() || (it->flags&1) || (it->method!=0 && it->method!=8) ||
        !it->uncompressed || it->uncompressed>limit || it->compressed>limit*2 || it->compressed==0)return false;

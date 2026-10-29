@@ -96,7 +96,7 @@ static void scanFolder(const std::string& dir,const std::string& collection,
         if(stat(path.c_str(),&st)!=0)continue;
         if(S_ISDIR(st.st_mode)){
             if(depth<5)scanFolder(path,collection.empty()?n:collection,out,depth+1);
-        }else if(S_ISREG(st.st_mode) && (ends(n,".cbz")||ends(n,".zip")||ends(n,".pdf")||ends(n,".epub")||ends(n,".txt"))){
+        }else if(S_ISREG(st.st_mode) && (ends(n,".cbz")||ends(n,".cbr")||ends(n,".zip")||ends(n,".pdf")||ends(n,".epub")||ends(n,".txt"))){
             out.push_back({n,path,collection});
         }
     }
@@ -1617,7 +1617,7 @@ int main(int argc,char**argv){(void)argc;(void)argv;
         else
             label(r,36,130,"< VOLTAR  /  "+compactTitle(works[selected].title,44),1,215,216,225);
         int count=portraitLibraryCount();
-        if(count==0)label(r,55,290,"Copie EPUB/TXT/PDF/CBZ para /switch/MangaCAP/books",2);
+        if(count==0)label(r,55,290,"Copie EPUB/TXT/PDF/CBZ/CBR para /switch/MangaCAP/books",2);
         SDL_Rect libraryClip{0,170,1280,485};SDL_RenderSetClipRect(r,&libraryClip);
         int first=std::max(0,(libraryHorizontalScroll/455)*3);
         int last=std::min(count,first+12);
